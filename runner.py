@@ -2,7 +2,8 @@ import pygame
 import sys
 import time
 
-import tictactoe as ttt
+# import tictactoe as ttt
+import tactictoe as ttt
 
 pygame.init()
 size = width, height = 600, 400
@@ -82,7 +83,7 @@ while True:
                 pygame.draw.rect(screen, white, rect, 3)
 
                 if board[i][j] != ttt.EMPTY:
-                    move = moveFont.render(board[i][j], True, white)
+                    move = moveFont.render(str(board[i][j]), True, white)
                     moveRect = move.get_rect()
                     moveRect.center = rect.center
                     screen.blit(move, moveRect)
