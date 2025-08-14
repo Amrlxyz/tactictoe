@@ -156,14 +156,14 @@ def minimax(board):
     # Determine the current player
     maxPlayer = True if player(board) == X else False
     
-    # Set the initial branch score (not inversed sign only for the initial call)
-    otherBranchScore = math.inf if maxPlayer else -math.inf
+    # # Set the initial branch score (not inversed sign only for the initial call)
+    # otherBranchScore = math.inf if maxPlayer else -math.inf
 
     path = set()
-    MAX_DEPTH = 10
+    MAX_DEPTH = 17
 
     # Starts the recursive function and get the optimal action
-    optScore, optAction = eval(board, path, MAX_DEPTH, otherBranchScore)
+    optScore, optAction = eval(board, path, MAX_DEPTH, alpha=-math.inf, beta=math.inf)
 
     # Print the callcount to measure the effect of ab pruning
     print("callcount:", callcount)
@@ -175,7 +175,7 @@ def minimax(board):
 # A dictionary to store scores of evaluated states
 transposition_table = {}
 
-def eval(board, path, depth, otherBranchScore):
+def eval(board, path, depth, alpha, beta):
     """
     Recursive function that evaluates until it reaches terminal board
     It uses the otherBranchScore argument to keep track of the other min/max of the other branch on the same parent that has been explored
@@ -184,11 +184,10 @@ def eval(board, path, depth, otherBranchScore):
     global callcount
     callcount += 1
 
-    # if str(board) in transposition_table:
-    #     return transposition_table[str(board)]
+    # if hashBoard(board) in transposition_table:
+    #     return transposition_table[hashBoard(board)]
 
     if hashBoard(board) in path:
-        print("Path Optimised")
         return (0, None)
 
     # Determine current player
@@ -212,7 +211,7 @@ def eval(board, path, depth, otherBranchScore):
         boardResult = result(board, action)
         
         # Call eval() for the resulting board from the action, while passing the explored branches' score (if theres any)
-        newScore, _ = eval(boardResult, path, depth - 1, score)
+        newScore, _ = eval(boardResult, path, depth - 1, alpha=alpha, beta=beta)
 
         # If its the maxPlayer's turn, update the new score if larger than current score
         if maxPlayer:
@@ -220,9 +219,10 @@ def eval(board, path, depth, otherBranchScore):
                 score = newScore
                 optAction = action
 
-            # If the score is larger than the other parent's branch, we can prune this branch (skip checking other branches)
-            if score >= otherBranchScore:
-                break
+            # # If the score is larger than the other parent's branch, we can prune this branch (skip checking other branches)
+            # if score >= otherBranchScore:
+            #     break
+            alpha = max(alpha, score)
 
         # If its the maxPlayer's turn, update the new score if smaller than current score
         else:
@@ -230,14 +230,18 @@ def eval(board, path, depth, otherBranchScore):
                 score = newScore
                 optAction = action
 
-            # If the score is larger than the other parent's branch, we can prune this branch (skip checking other branches)
-            if score <= otherBranchScore:
-                break
+            # # If the score is larger than the other parent's branch, we can prune this branch (skip checking other branches)
+            # if score <= otherBranchScore:
+            #     break
+            beta = min(beta, score)
+
+        if alpha >= beta:
+            break
 
     path.remove(hashBoard(board))
     
     # Return the pair of score and optimal action
-    # transposition_table[str(board)] = (score, optAction)
+    # transposition_table[hashBoard(board)] = (score, optAction)
     return (score, optAction)
 
 
