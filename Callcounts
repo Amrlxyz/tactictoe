@@ -1,0 +1,9 @@
+V1 (First branch excluded)
+minimax -> 549945 counts 
+minimax + ab pruning -> 14706 counts
+
+V2
+minimax -> 549946 counts
+
+
+
