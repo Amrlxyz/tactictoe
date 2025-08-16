@@ -3,6 +3,7 @@ Tic Tac Toe Player
 """
 
 import math
+import time
 import random
 from copy import deepcopy
 from pprint import pp
@@ -147,6 +148,8 @@ def minimax(board):
     global callcount
     callcount = 0
 
+    startTime = time.time() 
+
     # # random move
     # return random.choice(list(actions(board)))
 
@@ -160,6 +163,7 @@ def minimax(board):
 
     # Print the callcount to measure the effect of ab pruning
     print("callcount:", callcount)
+    print(f"Calculation Time: {(time.time() - startTime):.4f}s")
     print(f"OptScore: {optScore}, OptMove: {optAction}")
 
     # return optimal action
@@ -206,9 +210,35 @@ def eval(board, path, depth, alpha, beta, table):
     optAction = None
 
     path.append(boardHashed)
+    validMoves = list(actions(board))
+
+    if depth == MAX_DEPTH:
+        pp(validMoves)
+
+    symmetricalMoves = list()
+    checkedPairs = list()
+    for i in range(len(validMoves)):
+        action1 = validMoves[i]
+        for j in range(len(validMoves) - i - 1):
+            action2 = validMoves[j + 1 + i]
+            pair = (action1, action2)
+            if checkSymmetry(board, action1, action2):
+                symmetricalMoves.append(pair)
+            checkedPairs.append(pair)
+
+    if depth == MAX_DEPTH:
+        pp(symmetricalMoves)
+
+    # Remove symmetrical moves
+    for movePair in symmetricalMoves:
+        move = movePair[0]
+        try:
+            validMoves.remove(move)
+        except:
+            pass
 
     # Iterate over each actions available
-    for action in actions(board):
+    for action in validMoves:
         boardResult = result(board, action)
         
         # Call eval() for the resulting board from the action
@@ -248,3 +278,49 @@ def hashBoard(board):
     # to be used with sets
     hashable_version = tuple(cell for row in board for cell in row)
     return hashable_version
+
+
+
+
+def checkSymmetry(board, move1, move2):
+    
+    board1 = result(board, move1)
+    board2 = result(board, move2)
+
+    def TL_BR_Sym():
+        for i in range(3):
+            for j in range(3):
+                if board1[i][j] != board2[j][i]:
+                    return False
+        return True
+
+    def TR_BL_Sym():
+        for i in range(3):
+            for j in range(3):
+                if board1[i][j] != board2[2-j][2-i]:
+                    return False
+        return True
+
+    def L_R_Sym():
+        for i in range(3):
+            for j in range(3):
+                if board1[i][j] != board2[i][2-j]:
+                    return False
+        return True
+    
+    def T_B_Sym():
+        for i in range(3):
+            for j in range(3):
+                if board1[i][j] != board2[2-i][j]:
+                    return False
+        return True
+    
+    return any([TR_BL_Sym(), TL_BR_Sym(), L_R_Sym(), T_B_Sym()])
+
+
+board = initial_state()
+print(checkSymmetry(board, (2,1), (1,0)))
+
+
+     
+    
