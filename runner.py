@@ -111,10 +111,15 @@ while True:
 
         # Check for AI move
         if user != player and not game_over:
+        # if not game_over:
             if ai_turn:
                 time.sleep(0.5)
                 move = ttt.minimax(board)
                 board = ttt.result(board, move)
+                # Evaluate Next Move:
+                # print(" ")
+                # print("Next Move Eval:")
+                # ttt.minimax(board)
                 ai_turn = False
             else:
                 ai_turn = True
@@ -122,11 +127,16 @@ while True:
         # Check for a user move
         click, _, _ = pygame.mouse.get_pressed()
         if click == 1 and user == player and not game_over:
-            mouse = pygame.mouse.get_pos()
-            for i in range(3):
-                for j in range(3):
-                    if (board[i][j] == ttt.EMPTY and tiles[i][j].collidepoint(mouse)):
-                        board = ttt.result(board, (i, j))
+            # AI vs AI
+            time.sleep(0.5)
+            move = ttt.minimax(board)
+            board = ttt.result(board, move)
+            # Player vs AI
+            # mouse = pygame.mouse.get_pos()
+            # for i in range(3):
+            #     for j in range(3):
+            #         if (board[i][j] == ttt.EMPTY and tiles[i][j].collidepoint(mouse)):
+            #             board = ttt.result(board, (i, j))
 
         if game_over:
             againButton = pygame.Rect(width / 3, height - 65, width / 3, 50)

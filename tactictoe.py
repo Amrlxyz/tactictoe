@@ -5,6 +5,7 @@ Tic Tac Toe Player
 import math
 import random
 from copy import deepcopy
+from pprint import pp
 
 
 X = 6
@@ -119,12 +120,7 @@ def terminal(board):
     if winner(board) != None:
         return True
     
-    for row in board:
-        for cell in row:
-            if cell == EMPTY:
-                return False
-    
-    return True
+    return False
 
 
 def utility(board):
@@ -142,6 +138,7 @@ def utility(board):
 
 # callcount variable to track how many times eval() is called
 callcount = 0
+MAX_DEPTH = 14
 
 def minimax(board):
     """
@@ -153,29 +150,24 @@ def minimax(board):
     # # random move
     # return random.choice(list(actions(board)))
 
-    # Determine the current player
-    maxPlayer = True if player(board) == X else False
-    
-    # # Set the initial branch score (not inversed sign only for the initial call)
-    # otherBranchScore = math.inf if maxPlayer else -math.inf
+    path = list()
 
-    path = set()
-    MAX_DEPTH = 17
+    # A dictionary to store scores of evaluated states
+    transposition_table = {}
 
     # Starts the recursive function and get the optimal action
-    optScore, optAction = eval(board, path, MAX_DEPTH, alpha=-math.inf, beta=math.inf)
+    optScore, optAction = eval(board, path, MAX_DEPTH, alpha=-math.inf, beta=math.inf, table=transposition_table)
 
     # Print the callcount to measure the effect of ab pruning
     print("callcount:", callcount)
-    print(f"OptScore: {optScore}")
+    print(f"OptScore: {optScore}, OptMove: {optAction}")
 
     # return optimal action
     return optAction
 
-# A dictionary to store scores of evaluated states
-transposition_table = {}
 
-def eval(board, path, depth, alpha, beta):
+
+def eval(board, path, depth, alpha, beta, table):
     """
     Recursive function that evaluates until it reaches terminal board
     It uses the otherBranchScore argument to keep track of the other min/max of the other branch on the same parent that has been explored
@@ -184,64 +176,71 @@ def eval(board, path, depth, alpha, beta):
     global callcount
     callcount += 1
 
-    # if hashBoard(board) in transposition_table:
-    #     return transposition_table[hashBoard(board)]
+    boardHashed = hashBoard(board)
 
-    if hashBoard(board) in path:
+    # if boardHashed in table:
+    #     # print("Table Optimised")
+    #     return table[boardHashed]
+
+    if boardHashed in path:
         return (0, None)
 
-    # Determine current player
-    maxPlayer = True if player(board) == X else False
-
-    # Set the score and branchScore initially as infinite (inversed sign to the player goals)
-    score = -math.inf if maxPlayer else math.inf
-    
-    # Set optimal action as none since none has been explored yet
-    optAction = None
-
     # If terminal board, just return the utility as score and None as optimal Action
-    if terminal(board) or depth == 0:
+    if terminal(board):
+        score = utility(board) * depth 
+        return (score, None)
+    
+    if depth == 0:
+        # print("Depth Limit Reached")
+        # pp(path)
         score = utility(board)
         return (score, None)
 
-    path.add(hashBoard(board))
+    # Determine current player
+    maxPlayer = True if player(board) == X else False
+    if depth == MAX_DEPTH:
+        print("\n" + "MaxPlayer" if maxPlayer else "MinPlayer")
+    score = -math.inf if maxPlayer else math.inf
+
+    # Set optimal action as none since none has been explored yet
+    optAction = None
+
+    path.append(boardHashed)
 
     # Iterate over each actions available
     for action in actions(board):
         boardResult = result(board, action)
         
-        # Call eval() for the resulting board from the action, while passing the explored branches' score (if theres any)
-        newScore, _ = eval(boardResult, path, depth - 1, alpha=alpha, beta=beta)
+        # Call eval() for the resulting board from the action
+        newScore, _ = eval(boardResult, path, depth - 1, alpha=alpha, beta=beta, table=table)
 
         # If its the maxPlayer's turn, update the new score if larger than current score
         if maxPlayer:
             if newScore > score:
                 score = newScore
                 optAction = action
-
-            # # If the score is larger than the other parent's branch, we can prune this branch (skip checking other branches)
-            # if score >= otherBranchScore:
-            #     break
             alpha = max(alpha, score)
 
-        # If its the maxPlayer's turn, update the new score if smaller than current score
+        # If its the minPlayer's turn, update the new score if smaller than current score
         else:
             if newScore < score:
                 score = newScore
                 optAction = action
-
-            # # If the score is larger than the other parent's branch, we can prune this branch (skip checking other branches)
-            # if score <= otherBranchScore:
-            #     break
             beta = min(beta, score)
+
+        if depth == MAX_DEPTH:
+            # pp(boardResult)
+            print(f"{newScore}: ({action[0]}, {action[1]}, {alpha}/{beta})")# "a:", alpha, "b:", beta)
+            alpha = -math.inf
+            beta = math.inf
 
         if alpha >= beta:
             break
 
-    path.remove(hashBoard(board))
+    path.remove(boardHashed)
     
     # Return the pair of score and optimal action
-    # transposition_table[hashBoard(board)] = (score, optAction)
+    # table[boardHashed] = (score, optAction)
     return (score, optAction)
 
 
