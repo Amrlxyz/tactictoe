@@ -139,7 +139,10 @@ def utility(board):
 
 # callcount variable to track how many times eval() is called
 callcount = 0
-MAX_DEPTH = 14
+MAX_DEPTH = 15
+
+# A dictionary to store scores of evaluated states
+transposition_table = {}
 
 def minimax(board):
     """
@@ -155,9 +158,6 @@ def minimax(board):
 
     path = list()
 
-    # A dictionary to store scores of evaluated states
-    transposition_table = {}
-
     # Starts the recursive function and get the optimal action
     optScore, optAction = eval(board, path, MAX_DEPTH, alpha=-math.inf, beta=math.inf, table=transposition_table)
 
@@ -171,6 +171,9 @@ def minimax(board):
 
 
 
+
+
+
 def eval(board, path, depth, alpha, beta, table):
     """
     Recursive function that evaluates until it reaches terminal board
@@ -180,11 +183,37 @@ def eval(board, path, depth, alpha, beta, table):
     global callcount
     callcount += 1
 
+    EXACT = 0
+    UPPERBOUND = 1
+    LOWERBOUND = 2
+
+    alphaOrig = alpha
+
     boardHashed = hashBoard(board)
 
-    # if boardHashed in table:
-    #     # print("Table Optimised")
-    #     return table[boardHashed]
+
+    # (* Transposition Table Lookup; node is the lookup key for ttEntry *)
+    # ttEntry := transpositionTableLookup(node)
+    # if ttEntry.is_valid and ttEntry.depth ≥ depth then
+    #     if ttEntry.flag = EXACT then
+    #         return ttEntry.value
+    #     else if ttEntry.flag = LOWERBOUND and ttEntry.value ≥ beta then
+    #         return ttEntry.value
+    #     else if ttEntry.flag = UPPERBOUND and ttEntry.value ≤ alpha then
+    #         return ttEntry.value
+
+    if boardHashed in table:
+        entry = table[boardHashed]
+        if entry["depth"] >= depth:     
+            score = entry["score"]
+            flag = entry["flag"]
+            action = entry["action"]
+            if flag == EXACT:
+                return (score, action)
+            elif flag == LOWERBOUND and score >= beta:
+                return (score, action)
+            elif flag == UPPERBOUND and score <= alpha:
+                return (score, action)
 
     if boardHashed in path:
         return (0, None)
@@ -203,7 +232,7 @@ def eval(board, path, depth, alpha, beta, table):
     # Determine current player
     maxPlayer = True if player(board) == X else False
     if depth == MAX_DEPTH:
-        print("\n" + "MaxPlayer" if maxPlayer else "MinPlayer")
+        print("\n" + ("MaxPlayer" if maxPlayer else "MinPlayer"))
     score = -math.inf if maxPlayer else math.inf
 
     # Set optimal action as none since none has been explored yet
@@ -212,30 +241,30 @@ def eval(board, path, depth, alpha, beta, table):
     path.append(boardHashed)
     validMoves = list(actions(board))
 
-    if depth == MAX_DEPTH:
-        pp(validMoves)
+    # if depth == MAX_DEPTH:
+    #     pp(validMoves)
 
-    symmetricalMoves = list()
-    checkedPairs = list()
-    for i in range(len(validMoves)):
-        action1 = validMoves[i]
-        for j in range(len(validMoves) - i - 1):
-            action2 = validMoves[j + 1 + i]
-            pair = (action1, action2)
-            if checkSymmetry(board, action1, action2):
-                symmetricalMoves.append(pair)
-            checkedPairs.append(pair)
+    # symmetricalMoves = list()
+    # checkedPairs = list()
+    # for i in range(len(validMoves)):
+    #     action1 = validMoves[i]
+    #     for j in range(len(validMoves) - i - 1):
+    #         action2 = validMoves[j + 1 + i]
+    #         pair = (action1, action2)
+    #         if checkSymmetry(board, action1, action2):
+    #             symmetricalMoves.append(pair)
+    #         checkedPairs.append(pair)
 
-    if depth == MAX_DEPTH:
-        pp(symmetricalMoves)
+    # if depth == MAX_DEPTH:
+    #     pp(symmetricalMoves)
 
-    # Remove symmetrical moves
-    for movePair in symmetricalMoves:
-        move = movePair[0]
-        try:
-            validMoves.remove(move)
-        except:
-            pass
+    # # Remove symmetrical moves
+    # for movePair in symmetricalMoves:
+    #     move = movePair[0]
+    #     try:
+    #         validMoves.remove(move)
+    #     except:
+    #         pass
 
     # Iterate over each actions available
     for action in validMoves:
@@ -261,16 +290,38 @@ def eval(board, path, depth, alpha, beta, table):
         if depth == MAX_DEPTH:
             # pp(boardResult)
             print(f"{newScore}: ({action[0]}, {action[1]}, {alpha}/{beta})")# "a:", alpha, "b:", beta)
-            alpha = -math.inf
-            beta = math.inf
+            # alpha = -math.inf
+            # beta = math.inf
 
         if alpha >= beta:
             break
 
     path.remove(boardHashed)
     
-    # Return the pair of score and optimal action
-    # table[boardHashed] = (score, optAction)
+    # (* Transposition Table Store; node is the lookup key for ttEntry *)
+    # ttEntry.value := value
+    # if value ≤ alphaOrig then
+    #     ttEntry.flag := UPPERBOUND
+    # else if value ≥ β then
+    #     ttEntry.flag := LOWERBOUND
+    # else
+    #     ttEntry.flag := EXACT
+    # ttEntry.depth := depth
+    # ttEntry.is_valid := true
+    # transpositionTableStore(node, ttEntry)
+
+    entry = {}
+    entry["score"] = score
+    entry["depth"] = depth
+    entry["action"] = action 
+    if score <= alphaOrig:
+        entry["flag"] = UPPERBOUND
+    elif score >= beta:
+        entry["flag"] = LOWERBOUND
+    else:
+        entry["flag"] = EXACT
+    table[boardHashed] = entry
+    
     return (score, optAction)
 
 
@@ -316,10 +367,6 @@ def checkSymmetry(board, move1, move2):
         return True
     
     return any([TR_BL_Sym(), TL_BR_Sym(), L_R_Sym(), T_B_Sym()])
-
-
-board = initial_state()
-print(checkSymmetry(board, (2,1), (1,0)))
 
 
      
