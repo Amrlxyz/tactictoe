@@ -156,10 +156,30 @@ def minimax(board):
     # # random move
     # return random.choice(list(actions(board)))
 
-    path = list()
+    maxPlayer = True if player(board) == X else False
+    print("\n" + ("MaxPlayer" if maxPlayer else "MinPlayer"))
+    optScore  = -math.inf if maxPlayer else math.inf
+    optAction = None
 
-    # Starts the recursive function and get the optimal action
-    optScore, optAction = eval(board, path, MAX_DEPTH, alpha=-math.inf, beta=math.inf, table=transposition_table)
+    path = list()
+    validMoves = list(actions(board))
+
+    for action in validMoves:
+        boardResult = result(board, action)
+
+        # Starts the recursive function and get the optimal action
+        score, _ = eval(boardResult, path, MAX_DEPTH, alpha=-math.inf, beta=math.inf, table=transposition_table)
+
+        print(f"{score}: ({action[0]}, {action[1]})")
+              
+        if maxPlayer:
+            if score > optScore:
+                optScore = score
+                optAction = action
+        else:
+            if score < optScore:
+                optScore = score
+                optAction = action
 
     # Print the callcount to measure the effect of ab pruning
     print("callcount:", callcount)
@@ -168,9 +188,6 @@ def minimax(board):
 
     # return optimal action
     return optAction
-
-
-
 
 
 
@@ -188,19 +205,9 @@ def eval(board, path, depth, alpha, beta, table):
     LOWERBOUND = 2
 
     alphaOrig = alpha
+    betaOrig = beta
 
     boardHashed = hashBoard(board)
-
-
-    # (* Transposition Table Lookup; node is the lookup key for ttEntry *)
-    # ttEntry := transpositionTableLookup(node)
-    # if ttEntry.is_valid and ttEntry.depth ≥ depth then
-    #     if ttEntry.flag = EXACT then
-    #         return ttEntry.value
-    #     else if ttEntry.flag = LOWERBOUND and ttEntry.value ≥ beta then
-    #         return ttEntry.value
-    #     else if ttEntry.flag = UPPERBOUND and ttEntry.value ≤ alpha then
-    #         return ttEntry.value
 
     if boardHashed in table:
         entry = table[boardHashed]
@@ -224,15 +231,11 @@ def eval(board, path, depth, alpha, beta, table):
         return (score, None)
     
     if depth == 0:
-        # print("Depth Limit Reached")
-        # pp(path)
         score = utility(board)
         return (score, None)
 
     # Determine current player
     maxPlayer = True if player(board) == X else False
-    if depth == MAX_DEPTH:
-        print("\n" + ("MaxPlayer" if maxPlayer else "MinPlayer"))
     score = -math.inf if maxPlayer else math.inf
 
     # Set optimal action as none since none has been explored yet
@@ -287,28 +290,10 @@ def eval(board, path, depth, alpha, beta, table):
                 optAction = action
             beta = min(beta, score)
 
-        if depth == MAX_DEPTH:
-            # pp(boardResult)
-            print(f"{newScore}: ({action[0]}, {action[1]}, {alpha}/{beta})")# "a:", alpha, "b:", beta)
-            # alpha = -math.inf
-            # beta = math.inf
-
         if alpha >= beta:
             break
 
     path.remove(boardHashed)
-    
-    # (* Transposition Table Store; node is the lookup key for ttEntry *)
-    # ttEntry.value := value
-    # if value ≤ alphaOrig then
-    #     ttEntry.flag := UPPERBOUND
-    # else if value ≥ β then
-    #     ttEntry.flag := LOWERBOUND
-    # else
-    #     ttEntry.flag := EXACT
-    # ttEntry.depth := depth
-    # ttEntry.is_valid := true
-    # transpositionTableStore(node, ttEntry)
 
     entry = {}
     entry["score"] = score
@@ -316,7 +301,7 @@ def eval(board, path, depth, alpha, beta, table):
     entry["action"] = action 
     if score <= alphaOrig:
         entry["flag"] = UPPERBOUND
-    elif score >= beta:
+    elif score >= betaOrig:
         entry["flag"] = LOWERBOUND
     else:
         entry["flag"] = EXACT
