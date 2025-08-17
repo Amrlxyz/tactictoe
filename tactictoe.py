@@ -170,7 +170,7 @@ def minimax(board):
         boardResult = result(board, action)
 
         # Starts the recursive function and get the optimal action
-        score, _ = eval(boardResult, path, MAX_DEPTH, alpha=alpha, beta=beta, table=transposition_table)
+        score, _, _ = eval(boardResult, path, MAX_DEPTH, alpha=alpha, beta=beta, table=transposition_table)
 
         if maxPlayer:
             if score > optScore:
@@ -228,6 +228,7 @@ def eval(board, path, depth, alpha, beta, table):
 
     alphaOrig = alpha
     betaOrig = beta
+    isValid = False
 
     boardHashed = hashBoard(board)
 
@@ -240,35 +241,35 @@ def eval(board, path, depth, alpha, beta, table):
             if flag == EXACT:
                 if indent_level < INDENT_MAX: 
                     print(f"{indent}L--> TABLE EXACT: Returning Score: {score}, Best Move: {action}, {boardHashed}")
-                return (score, action)
+                return (score, action, True)
             elif flag == LOWERBOUND and score >= beta:
                 if indent_level < INDENT_MAX: 
                     print(f"{indent}L--> TABLE LOWER: Returning Score: {score}, Best Move: {action}, {boardHashed}")
-                return (score, action)
+                return (score, action, True)
             elif flag == UPPERBOUND and score <= alpha:
                 if indent_level < INDENT_MAX: 
                     print(f"{indent}L--> TABLE UPPER: Returning Score: {score}, Best Move: {action}, {boardHashed}")
-                return (score, action)
+                return (score, action, True)
 
-    # if boardHashed in path:
-    #     score = 0
-    #     if indent_level < INDENT_MAX: 
-    #         print(f"{indent}L-> Path Repeated! Score: {score}, Board: {boardHashed}")
-    #     return (score, None)
+    if boardHashed in path:
+        score = 0
+        if indent_level < INDENT_MAX: 
+            print(f"{indent}L-> Path Repeated! Score: {score}, Board: {boardHashed}")
+        return (score, None, False)
 
     # If terminal board, just return the utility as score and None as optimal Action
     if terminal(board):
         score = utility(board) * depth 
         if indent_level < INDENT_MAX: 
             print(f"{indent}L-> Terminal Node! Score: {score}, Prev Board: {path[-1]}, Curr Board: {boardHashed}")
-        return (score, None)
+        return (score, None, True)
     
     if depth == 0:
         score = utility(board)
         if indent_level < INDENT_MAX: 
             print(f"{indent}L-> Depth Limit! Score: {score}, Board: {boardHashed}")
         # print(indent + "Depth Limited")
-        return (score, None)
+        return (score, None, False)
 
     # Determine current player
     maxPlayer = True if player(board) == X else False
@@ -283,13 +284,14 @@ def eval(board, path, depth, alpha, beta, table):
         boardResult = result(board, action)
         
         # Call eval() for the resulting board from the action
-        score, optNextAction = eval(boardResult, path, depth - 1, alpha=alpha, beta=beta, table=table)
+        score, optNextAction, isNextValid = eval(boardResult, path, depth - 1, alpha=alpha, beta=beta, table=table)
 
         # If its the maxPlayer's turn, update the new score if larger than current score
         if maxPlayer:
             if score > optScore:
                 optScore = score
                 optAction = action
+                isValid = isNextValid
             alpha = max(alpha, optScore)
             if optScore >= beta:
                 if indent_level < INDENT_MAX: 
@@ -301,6 +303,7 @@ def eval(board, path, depth, alpha, beta, table):
             if score < optScore:
                 optScore = score
                 optAction = action
+                isValid = isNextValid
             beta = min(beta, optScore)
             if optScore <= alpha:
                 if indent_level < INDENT_MAX: 
@@ -309,34 +312,32 @@ def eval(board, path, depth, alpha, beta, table):
 
     path.pop(-1)
 
-    entry = {}
-    entry["score"] = optScore
-    entry["action"] = optAction 
-    entry["depth"] = depth
-
-    if maxPlayer:
-        if optScore <= alphaOrig:
-            entry["flag"] = UPPERBOUND
-        elif optScore >= beta:
-            entry["flag"] = LOWERBOUND
+    if isValid:
+        entry = {}
+        entry["score"] = optScore
+        entry["action"] = optAction 
+        entry["depth"] = depth    
+        if maxPlayer:
+            if optScore <= alphaOrig:
+                entry["flag"] = UPPERBOUND
+            elif optScore >= beta:
+                entry["flag"] = LOWERBOUND
+            else:
+                entry["flag"] = EXACT
         else:
-            entry["flag"] = EXACT
-    else:
-        if optScore >= betaOrig:
-            entry["flag"] = LOWERBOUND
-        elif optScore <= alpha:
-            entry["flag"] = UPPERBOUND
-        else:
-            entry["flag"] = EXACT
-        
-    table[boardHashed] = entry
-
+            if optScore >= betaOrig:
+                entry["flag"] = LOWERBOUND
+            elif optScore <= alpha:
+                entry["flag"] = UPPERBOUND
+            else:
+                entry["flag"] = EXACT
+        table[boardHashed] = entry
 
     # Final print showing what this level is returning
     if indent_level < INDENT_MAX: 
         print(f"{indent}L--> Returning Score: {optScore}, Best Move: {optAction}, {boardHashed}, Flag: {entry['flag']}")
     
-    return (optScore, optAction)
+    return (optScore, optAction, True)
 
 
 def hashBoard(board):
