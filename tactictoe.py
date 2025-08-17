@@ -172,8 +172,6 @@ def minimax(board):
         # Starts the recursive function and get the optimal action
         score, _ = eval(boardResult, path, MAX_DEPTH, alpha=alpha, beta=beta, table=transposition_table)
 
-        print(f"{score}: {action}  {alpha}/{beta}")
-
         if maxPlayer:
             if score > optScore:
                 optScore = score
@@ -188,6 +186,8 @@ def minimax(board):
 
         if alpha >= beta:
             break
+
+        print(f"{score}: {action}  {alpha}/{beta}")
 
     # Print the callcount to measure the effect of ab pruning
     print("callcount:", callcount)
@@ -212,6 +212,7 @@ def eval(board, path, depth, alpha, beta, table):
 
     # --- VISUALIZATION CODE ---
     INDENT_MAX = MAX_DEPTH + 1
+    INDENT_MAX = 0
 
     # Calculate indentation level for printing
     indent_level = MAX_DEPTH - depth
@@ -249,11 +250,11 @@ def eval(board, path, depth, alpha, beta, table):
                     print(f"{indent}L--> TABLE UPPER: Returning Score: {score}, Best Move: {action}, {boardHashed}")
                 return (score, action)
 
-    if boardHashed in path:
-        score = 0
-        if indent_level < INDENT_MAX: 
-            print(f"{indent}L-> Path Repeated! Score: {score}, Board: {boardHashed}")
-        return (score, None)
+    # if boardHashed in path:
+    #     score = 0
+    #     if indent_level < INDENT_MAX: 
+    #         print(f"{indent}L-> Path Repeated! Score: {score}, Board: {boardHashed}")
+    #     return (score, None)
 
     # If terminal board, just return the utility as score and None as optimal Action
     if terminal(board):
@@ -282,26 +283,29 @@ def eval(board, path, depth, alpha, beta, table):
         boardResult = result(board, action)
         
         # Call eval() for the resulting board from the action
-        score, _ = eval(boardResult, path, depth - 1, alpha=alpha, beta=beta, table=table)
+        score, optNextAction = eval(boardResult, path, depth - 1, alpha=alpha, beta=beta, table=table)
 
         # If its the maxPlayer's turn, update the new score if larger than current score
         if maxPlayer:
             if score > optScore:
                 optScore = score
                 optAction = action
-            alpha = max(alpha, score)
+            alpha = max(alpha, optScore)
+            if optScore >= beta:
+                if indent_level < INDENT_MAX: 
+                    print(f"{indent}--> PRUNING! (Alpha={alpha}, Beta={beta})")
+                break
 
         # If its the minPlayer's turn, update the new score if smaller than current score
         else:
             if score < optScore:
                 optScore = score
                 optAction = action
-            beta = min(beta, score)
-
-        if alpha >= beta:
-            if indent_level < INDENT_MAX: 
-                print(f"{indent}--> PRUNING! (Alpha={alpha}, Beta={beta})")
-            break
+            beta = min(beta, optScore)
+            if optScore <= alpha:
+                if indent_level < INDENT_MAX: 
+                    print(f"{indent}--> PRUNING! (Alpha={alpha}, Beta={beta})")
+                break
 
     path.pop(-1)
 
@@ -309,13 +313,24 @@ def eval(board, path, depth, alpha, beta, table):
     entry["score"] = optScore
     entry["action"] = optAction 
     entry["depth"] = depth
-    if optScore <= alphaOrig:
-        entry["flag"] = UPPERBOUND
-    elif optScore >= betaOrig:
-        entry["flag"] = LOWERBOUND
+
+    if maxPlayer:
+        if optScore <= alphaOrig:
+            entry["flag"] = UPPERBOUND
+        elif optScore >= beta:
+            entry["flag"] = LOWERBOUND
+        else:
+            entry["flag"] = EXACT
     else:
-        entry["flag"] = EXACT
+        if optScore >= betaOrig:
+            entry["flag"] = LOWERBOUND
+        elif optScore <= alpha:
+            entry["flag"] = UPPERBOUND
+        else:
+            entry["flag"] = EXACT
+        
     table[boardHashed] = entry
+
 
     # Final print showing what this level is returning
     if indent_level < INDENT_MAX: 
@@ -328,8 +343,6 @@ def hashBoard(board):
     # to be used with sets
     hashable_version = tuple(cell for row in board for cell in row)
     return hashable_version
-
-
 
 
 def checkSymmetry(board, move1, move2):
