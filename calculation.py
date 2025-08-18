@@ -192,10 +192,7 @@ def hashDiff(hash1, hash2):
     return (board_index // 3, board_index % 3)
 
 
-if __name__ == "__main__":
-    states_hash = generate_states()
-    print(f"Generated {len(states_hash)} unique states.")
-
+def evaluate_best_moves(states_hash):
     # Create a lookup for the children of each state to avoid re-calculating
     children = {}
     for hash_val in states_hash:
@@ -206,15 +203,23 @@ if __name__ == "__main__":
         else:
             children[hash_val] = []
 
+    # Base Scores
+    MAX_SCORE = 100
+    MIN_SCORE = -100
+    DRAW_SCORE = 0
+
     scores = {}
 
     # 1. Initialization
     for hash_val in states_hash:
         state_winner = winner(hashToState(hash_val))
-        if state_winner != 0:
-            scores[hash_val] = state_winner  # Set definite score for terminal states
+        if state_winner == X:
+            scores[hash_val] = MAX_SCORE
+        elif state_winner == O:
+            scores[hash_val] = MIN_SCORE
         else:
-            scores[hash_val] = 0  # Initialize non-terminal states to 0 (draw/unknown)
+            scores[hash_val] = DRAW_SCORE
+
 
     # 2. Iteration until convergence
     iteration_count = 0
@@ -237,13 +242,21 @@ if __name__ == "__main__":
             child_scores = [scores[child_hash] for child_hash in child_hashes]
 
             # Apply the minimax principle
-            new_score = 0
+            best_child_score = 0
             if hashToState(hash_val)["turn"] == X:
-                new_score = max(child_scores)
+                best_child_score = max(child_scores)
             else:  # Turn is O
-                new_score = min(child_scores)
+                best_child_score = min(child_scores)
             
-            # If the calculated score is different, update it and note the change
+            # Adjust the score based on depth
+            new_score = 0
+            if best_child_score > DRAW_SCORE:  # It's a path to a win
+                new_score = best_child_score - 1
+            elif best_child_score < DRAW_SCORE: # It's a path to a loss
+                new_score = best_child_score + 1
+            else: # It's a draw
+                new_score = DRAW_SCORE
+
             if scores[hash_val] != new_score:
                 scores[hash_val] = new_score
                 changes += 1
@@ -258,15 +271,26 @@ if __name__ == "__main__":
     # Store the new best moves
     best_moves = {}
     for hash_val in scores:
-        best_moves[hash_val] = [hashDiff(hash_val, child_hash) for child_hash in children[hash_val] if scores[hash_val] == scores[child_hash]]
+        best_moves[hash_val] = [hashDiff(hash_val, child_hash) for child_hash in children[hash_val] if scores[child_hash] == scores[hash_val] + 1]
             
     print(f"\nFound scores for {len(scores)} states.")
     # You can now inspect the 'scores' dictionary for the optimal value of any state.
     # For example, to find the score of the initial empty board:
     initial_hash = hashBoard(initial_state())
-    print(f"Starting board optimal score: {scores[initial_hash]}, Best Moves: {best_moves[initial_hash]}")
+    print(f"Starting board optimal score: {MAX_SCORE - scores[initial_hash]}, Best Moves: {best_moves[initial_hash]}")
 
-    pprint(len(best_moves))
-    pprint(len(scores))
+    # pprint([move for move in best_moves if move == []])
+    # pprint([score for score in scores if score == 0])
 
+    return (scores, best_moves)
+
+
+if __name__ == "__main__":
+    
+    states_hash = generate_states()
+    print(f"Generated {len(states_hash)} unique states.")
+
+    scores, best_moves = evaluate_best_moves(states_hash)
+
+    pprint([(scores[state_hash], state_hash, best_moves[state_hash]) for state_hash in states_hash if scores[state_hash] <= 100-17 and scores[state_hash] > 0])
 
