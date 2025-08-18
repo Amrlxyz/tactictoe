@@ -182,46 +182,91 @@ def hashToState(hash):
     }
 
 
+def hashDiff(hash1, hash2):
+    """
+    Returns move that changes hash1 to hash2
+    """
+    player = hash1[-1]
+    board_index = hash2.index(player)
+
+    return (board_index // 3, board_index % 3)
+
+
 if __name__ == "__main__":
     states_hash = generate_states()
-    # pprint(len([state for state in states_hash if state[-1] != 0]))
+    print(f"Generated {len(states_hash)} unique states.")
 
-    children = {hash: [result(hashToState(hash), move) for move in get_moves(hashToState(hash))] for hash in states_hash}
+    # Create a lookup for the children of each state to avoid re-calculating
+    children = {}
+    for hash_val in states_hash:
+        state = hashToState(hash_val)
+        # Only calculate children for non-terminal states
+        if winner(state) == 0:
+            children[hash_val] = [hashBoard(result(state, move)) for move in get_moves(state)]
+        else:
+            children[hash_val] = []
+
     scores = {}
 
-    for hash in states_hash:
-        state_winner = winner(hashToState(hash))
+    # 1. Initialization
+    for hash_val in states_hash:
+        state_winner = winner(hashToState(hash_val))
         if state_winner != 0:
-            scores[hash] = state_winner
-            children[hash] = []
+            scores[hash_val] = state_winner  # Set definite score for terminal states
+        else:
+            scores[hash_val] = 0  # Initialize non-terminal states to 0 (draw/unknown)
 
-    # 2. propagate backwards until all states are scored
-    loopcount = 0
-    changed = True
-    while changed:
-        changed = False
-        for hash in states_hash:
-            if hash in scores:
-                continue
-            child_scores = [scores[hashBoard(child)] for child in children[hash] if hashBoard(child) in scores]
-
-            if len(child_scores) > 1:
-                pprint(child_scores)
-
-            if len(child_scores) == len(children[hash]):  # all children scored
-                if hashToState(hash)["turn"] == X:
-                    scores[hash] = max(child_scores)
-                else:
-                    scores[hash] = min(child_scores)
-                
-                print(".", end="")
-                changed = True
+    # 2. Iteration until convergence
+    iteration_count = 0
+    while True:
+        iteration_count += 1
+        print(f"Starting iteration {iteration_count}...")
         
-        loopcount += 1
-        print(loopcount) 
-    
+        # Keep track of changes in a single pass
+        changes = 0
+        
+        # Go through every state that is not a terminal win/loss
+        for hash_val in states_hash:
+            if winner(hashToState(hash_val)) != 0:
+                continue
 
-    print(len(scores))
-    # pprint(scores)
+            # Get the current scores of all children states
+            # Note: We use the scores from the *previous* iteration to calculate the new ones
+            child_hashes = children[hash_val]
+            
+            child_scores = [scores[child_hash] for child_hash in child_hashes]
+
+            # Apply the minimax principle
+            new_score = 0
+            if hashToState(hash_val)["turn"] == X:
+                new_score = max(child_scores)
+            else:  # Turn is O
+                new_score = min(child_scores)
+            
+            # If the calculated score is different, update it and note the change
+            if scores[hash_val] != new_score:
+                scores[hash_val] = new_score
+                changes += 1
+
+        print(f"Iteration {iteration_count} finished with {changes} updates.")
+        
+        # 3. Convergence Check
+        if changes == 0:
+            print("Scores have converged. Halting.")
+            break
+
+    # Store the new best moves
+    best_moves = {}
+    for hash_val in scores:
+        best_moves[hash_val] = [hashDiff(hash_val, child_hash) for child_hash in children[hash_val] if scores[hash_val] == scores[child_hash]]
+            
+    print(f"\nFound scores for {len(scores)} states.")
+    # You can now inspect the 'scores' dictionary for the optimal value of any state.
+    # For example, to find the score of the initial empty board:
+    initial_hash = hashBoard(initial_state())
+    print(f"Starting board optimal score: {scores[initial_hash]}, Best Moves: {best_moves[initial_hash]}")
+
+    pprint(len(best_moves))
+    pprint(len(scores))
 
 
