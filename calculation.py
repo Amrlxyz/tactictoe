@@ -1,6 +1,7 @@
 
 import collections
 from copy import deepcopy
+from pprint import pprint
 
 X = 3
 O = -3
@@ -111,7 +112,7 @@ def winner(state):
     if all(board[2-i][i] < 0 for i in range(3)):
         return O
     
-    return None
+    return 0
 
 
 def terminal(state):
@@ -133,20 +134,20 @@ def generate_states():
     return states
 
 
-
 def BFS(initial_state):
 
     states_list = set()
     queue = collections.deque()
-    
+    depth = 0
+
     states_list.add(hashBoard(initial_state))
-    queue.append(initial_state)
+    queue.append((initial_state, depth))
 
     while queue:
         # get a vertex from queue
-        state = queue.popleft()
+        state, depth = queue.popleft()
 
-        if winner(state) != None:
+        if winner(state) != 0:
             continue
 
         # if not in list, add to list and queue
@@ -157,9 +158,8 @@ def BFS(initial_state):
                 continue
             else:
                 states_list.add(hashBoard(newstate))
-                queue.append(newstate)
-
-        print(len(states_list))
+                queue.append((newstate, depth+1))
+                print(len(states_list), depth+1)
 
     return states_list
 
@@ -168,12 +168,25 @@ def hashBoard(state):
     
     hash = [cell for row in state["board"] for cell in row]
     hash.append(state["turn"])
+    hash.append(winner(state))
     hashable_version = tuple(hash)
     
     return hashable_version
 
 
+def hashToState(hash):
+    board = [list(hash[0:3]), list(hash[3:6]), list(hash[6:9])]
+    
+    return {
+        "board": board,
+        "turn" : hash[9]
+    }
+
+
 if __name__ == "__main__":
-    states = generate_states()
-    print(len(states))
+    states_hash = generate_states()
+    # pprint(len([state for state in states_hash if state[-1] != 0]))
+
+    children = {hash: [result(hashToState(hash), move) for move in get_moves(hashToState(hash))] for hash in states_hash}
+    pprint(children)
 
