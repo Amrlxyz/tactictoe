@@ -168,7 +168,6 @@ def hashBoard(state):
     
     hash = [cell for row in state["board"] for cell in row]
     hash.append(state["turn"])
-    hash.append(winner(state))
     hashable_version = tuple(hash)
     
     return hashable_version
@@ -188,5 +187,41 @@ if __name__ == "__main__":
     # pprint(len([state for state in states_hash if state[-1] != 0]))
 
     children = {hash: [result(hashToState(hash), move) for move in get_moves(hashToState(hash))] for hash in states_hash}
-    pprint(children)
+    scores = {}
+
+    for hash in states_hash:
+        state_winner = winner(hashToState(hash))
+        if state_winner != 0:
+            scores[hash] = state_winner
+            children[hash] = []
+
+    # 2. propagate backwards until all states are scored
+    loopcount = 0
+    changed = True
+    while changed:
+        changed = False
+        for hash in states_hash:
+            if hash in scores:
+                continue
+            child_scores = [scores[hashBoard(child)] for child in children[hash] if hashBoard(child) in scores]
+
+            if len(child_scores) > 1:
+                pprint(child_scores)
+
+            if len(child_scores) == len(children[hash]):  # all children scored
+                if hashToState(hash)["turn"] == X:
+                    scores[hash] = max(child_scores)
+                else:
+                    scores[hash] = min(child_scores)
+                
+                print(".", end="")
+                changed = True
+        
+        loopcount += 1
+        print(loopcount) 
+    
+
+    print(len(scores))
+    # pprint(scores)
+
 
