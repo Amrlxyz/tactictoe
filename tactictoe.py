@@ -196,7 +196,7 @@ def minimax(board):
     print(f"Calculation Time: {(time.time() - startTime):.4f}s")
     print(f"OPT -> Score: {optScore}, Move: {optAction}")
     print(len(transposition_table))
-    # pp([(state, value) for state, value in transposition_table.items() if value["depth"] == MAX_DEPTH])
+    pp([(state, value) for state, value in transposition_table.items() if value["score"] != 3])
 
     # return optimal action
     return optAction

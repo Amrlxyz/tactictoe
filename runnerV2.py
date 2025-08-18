@@ -3,7 +3,7 @@ import sys
 import time
 
 # import tictactoe as ttt
-import tactictoeV2 as ttt
+import tactictoeV2_negamax_basic as ttt
 
 pygame.init()
 size = width, height = 600, 400
