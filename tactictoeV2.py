@@ -150,7 +150,7 @@ MAX_DEPTH = 15
 # A dictionary to store scores of evaluated states
 transposition_table = {}
 
-def minimax(state):
+def negamax(state):
     """
     Returns the optimal action for the current player on the board.
     """
@@ -166,32 +166,23 @@ def minimax(state):
     print("\n" + ("MaxPlayer" if maxPlayer else "MinPlayer"))
     optScore  = -math.inf if maxPlayer else math.inf
     optAction = None
+    sign = -1 if maxPlayer else 1
 
     path = list()
     validMoves = list(actions(state))
-    alpha = -math.inf
-    beta = math.inf
+    alpha = -math.inf*sign
+    beta = math.inf*sign
 
     for action in validMoves:
         boardResult = result(state, action)
 
         # Starts the recursive function and get the optimal action
-        score, _ = eval(boardResult, path, MAX_DEPTH, alpha=alpha, beta=beta, table=transposition_table)
+        score, _ = eval(boardResult, path, MAX_DEPTH, alpha=alpha, beta=beta, sign=sign, table=transposition_table)
+        score = -score
 
-        if maxPlayer:
-            if score > optScore:
-                optScore = score
-                optAction = action
-            # alpha = max(alpha, score)
-            
-        else:
-            if score < optScore:
-                optScore = score
-                optAction = action
-            # beta = min(beta, score)
-
-        # if alpha >= beta:
-        #     break
+        if score > optScore:
+            optScore = score
+            optAction = action
 
         print(f"{score}: {action}  {alpha}/{beta}")
 
@@ -207,7 +198,7 @@ def minimax(state):
 
 
 
-def eval(state, path, depth, alpha, beta, table):
+def eval(state, path, depth, alpha, beta, sign, table):
     """
     Recursive function that evaluates until it reaches terminal board
     It uses the otherBranchScore argument to keep track of the other min/max of the other branch on the same parent that has been explored
@@ -216,24 +207,11 @@ def eval(state, path, depth, alpha, beta, table):
     global callcount
     callcount += 1
 
-    # --- VISUALIZATION CODE ---
-    INDENT_MAX = MAX_DEPTH + 1
-    INDENT_MAX = 0
-
-    # Calculate indentation level for printing
-    indent_level = MAX_DEPTH - depth
-    indent = "    " * indent_level
-
-    if indent_level < INDENT_MAX: 
-        print(f"{indent}Depth {depth}: Player {player(state)}, Alpha={alpha}, Beta={beta}, Board={state["board"]}")
-    # --- END VISUALIZATION CODE ---
-
     EXACT = 0
     UPPERBOUND = 1
     LOWERBOUND = 2
 
     alphaOrig = alpha
-    betaOrig = beta
 
     boardHashed = hashBoard(state)
 
@@ -244,41 +222,26 @@ def eval(state, path, depth, alpha, beta, table):
             flag = entry["flag"]
             action = entry["action"]
             if flag == EXACT:
-                if indent_level < INDENT_MAX: 
-                    print(f"{indent}L--> TABLE EXACT: Returning Score: {score}, Best Move: {action}, {boardHashed}")
                 return (score, action)
             elif flag == LOWERBOUND and score >= beta:
-                if indent_level < INDENT_MAX: 
-                    print(f"{indent}L--> TABLE LOWER: Returning Score: {score}, Best Move: {action}, {boardHashed}")
                 return (score, action)
             elif flag == UPPERBOUND and score <= alpha:
-                if indent_level < INDENT_MAX: 
-                    print(f"{indent}L--> TABLE UPPER: Returning Score: {score}, Best Move: {action}, {boardHashed}")
                 return (score, action)
 
-    if boardHashed in path:
-        score = 0
-        if indent_level < INDENT_MAX: 
-            print(f"{indent}L-> Path Repeated! Score: {score}, Board: {boardHashed}")
-        return (score, None)
+    # if boardHashed in path:
+    #     score = 0
+    #     return (score, None)
 
     # If terminal board, just return the utility as score and None as optimal Action
     if terminal(state):
         score = utility(state, depth)
-        if indent_level < INDENT_MAX: 
-            print(f"{indent}L-> Terminal Node! Score: {score}, Prev Board: {path[-1]}, Curr Board: {boardHashed}")
         return (score, None)
     
     if depth == 0:
         score = 0
-        if indent_level < INDENT_MAX: 
-            print(f"{indent}L-> Depth Limit! Score: {score}, Board: {boardHashed}")
-        # print(indent + "Depth Limited")
         return (score, None)
 
-    # Determine current player
-    maxPlayer = True if player(state) == X else False
-    optScore = -math.inf if maxPlayer else math.inf
+    optScore = -math.inf
     optAction = None        # Set optimal action as none since none has been explored yet
 
     path.append(boardHashed)
@@ -289,29 +252,15 @@ def eval(state, path, depth, alpha, beta, table):
         boardResult = result(state, action)
         
         # Call eval() for the resulting board from the action
-        score, optNextAction = eval(boardResult, path, depth - 1, alpha=alpha, beta=beta, table=table)
+        score, optNextAction = eval(boardResult, path, depth - 1, alpha=-beta, beta=-alpha, sign=-sign, table=table)
+        score = -score
 
-        # If its the maxPlayer's turn, update the new score if larger than current score
-        if maxPlayer:
-            if score > optScore:
-                optScore = score
-                optAction = action
-            alpha = max(alpha, optScore)
-            if optScore >= beta:
-                if indent_level < INDENT_MAX: 
-                    print(f"{indent}--> PRUNING! (Alpha={alpha}, Beta={beta})")
-                break
-
-        # If its the minPlayer's turn, update the new score if smaller than current score
-        else:
-            if score < optScore:
-                optScore = score
-                optAction = action
-            beta = min(beta, optScore)
-            if optScore <= alpha:
-                if indent_level < INDENT_MAX: 
-                    print(f"{indent}--> PRUNING! (Alpha={alpha}, Beta={beta})")
-                break
+        if score > optScore:
+            optScore = score
+            optAction = action
+        alpha = max(alpha, score)
+        if alpha >= beta:
+            break
 
     path.pop(-1)
 
@@ -319,26 +268,14 @@ def eval(state, path, depth, alpha, beta, table):
     entry["score"] = optScore
     entry["action"] = optAction 
     entry["depth"] = depth    
-    if maxPlayer:
-        if optScore <= alphaOrig:
-            entry["flag"] = UPPERBOUND
-        elif optScore >= beta:
-            entry["flag"] = LOWERBOUND
-        else:
-            entry["flag"] = EXACT
+    if optScore <= alphaOrig:
+        entry["flag"] = UPPERBOUND
+    elif optScore >= beta:
+        entry["flag"] = LOWERBOUND
     else:
-        if optScore >= betaOrig:
-            entry["flag"] = LOWERBOUND
-        elif optScore <= alpha:
-            entry["flag"] = UPPERBOUND
-        else:
-            entry["flag"] = EXACT
+        entry["flag"] = EXACT
     table[boardHashed] = entry
 
-    # Final print showing what this level is returning
-    if indent_level < INDENT_MAX: 
-        print(f"{indent}L--> Returning Score: {optScore}, Best Move: {optAction}, {boardHashed}, Flag: {entry['flag']}")
-    
     return (optScore, optAction)
 
 

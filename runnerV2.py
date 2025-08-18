@@ -114,12 +114,12 @@ while True:
         # if not game_over:
             if ai_turn:
                 time.sleep(0.5)
-                move = ttt.minimax(state)
+                move = ttt.negamax(state)
                 state = ttt.result(state, move)
                 # Evaluate Next Move:
                 # print(" ")
                 # print("Next Move Eval:")
-                # ttt.minimax(board)
+                # ttt.negamax(board)
                 ai_turn = False
             else:
                 ai_turn = True
@@ -129,7 +129,7 @@ while True:
         if click == 1 and user == player and not game_over:
             # AI vs AI
             time.sleep(0.5)
-            move = ttt.minimax(state)
+            move = ttt.negamax(state)
             state = ttt.result(state, move)
             # Player vs AI
             # mouse = pygame.mouse.get_pos()
