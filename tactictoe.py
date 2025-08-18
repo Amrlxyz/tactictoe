@@ -47,12 +47,14 @@ def actions(board):
     """
     Returns set of all possible actions (i, j) available on the board.
     """
-    moves = set()
+    moves = list()
 
     for i, row in enumerate(board):
         for j, cell in enumerate(row):
             if cell == EMPTY:
-                moves.add((i,j))
+                moves.append((i,j))
+
+    random.shuffle(moves)
 
     return moves
 
@@ -176,16 +178,16 @@ def minimax(board):
             if score > optScore:
                 optScore = score
                 optAction = action
-            alpha = max(alpha, score)
+            # alpha = max(alpha, score)
             
         else:
             if score < optScore:
                 optScore = score
                 optAction = action
-            beta = min(beta, score)
+            # beta = min(beta, score)
 
-        if alpha >= beta:
-            break
+        # if alpha >= beta:
+        #     break
 
         print(f"{score}: {action}  {alpha}/{beta}")
 
@@ -337,7 +339,7 @@ def eval(board, path, depth, alpha, beta, table):
     if indent_level < INDENT_MAX: 
         print(f"{indent}L--> Returning Score: {optScore}, Best Move: {optAction}, {boardHashed}, Flag: {entry['flag']}")
     
-    return (optScore, optAction, True)
+    return (optScore, optAction, isValid)
 
 
 def hashBoard(board):

@@ -3,7 +3,7 @@ import sys
 import time
 
 # import tictactoe as ttt
-import tactictoe as ttt
+import tactictoeV2 as ttt
 
 pygame.init()
 size = width, height = 600, 400
@@ -90,12 +90,12 @@ while True:
                 row.append(rect)
             tiles.append(row)
 
-        game_over = ttt.terminal(board)
-        player = ttt.player(board)
+        game_over = ttt.terminal(state)
+        player = ttt.player(state)
 
         # Show title
         if game_over:
-            winner = ttt.winner(board)
+            winner = ttt.winner(state)
             if winner is None:
                 title = f"Game Over: Tie."
             else:
@@ -114,8 +114,8 @@ while True:
         # if not game_over:
             if ai_turn:
                 time.sleep(0.5)
-                move = ttt.minimax(board)
-                board = ttt.result(board, move)
+                move = ttt.minimax(state)
+                state = ttt.result(state, move)
                 # Evaluate Next Move:
                 # print(" ")
                 # print("Next Move Eval:")
@@ -129,8 +129,8 @@ while True:
         if click == 1 and user == player and not game_over:
             # AI vs AI
             time.sleep(0.5)
-            move = ttt.minimax(board)
-            board = ttt.result(board, move)
+            move = ttt.minimax(state)
+            state = ttt.result(state, move)
             # Player vs AI
             # mouse = pygame.mouse.get_pos()
             # for i in range(3):
@@ -151,7 +151,7 @@ while True:
                 if againButton.collidepoint(mouse):
                     time.sleep(0.2)
                     user = None
-                    board = ttt.initial_state()
+                    state = ttt.initial_state()
                     ai_turn = False
 
     pygame.display.flip()
