@@ -46,6 +46,72 @@ def get_moves(state):
     return moves
 
 
+def flatten_board(board):
+    return [cell for row in board for cell in row]
+
+
+def encodeState(board_flat, turn):
+
+    # - encode the current turn as if its always the +ve player move, 
+    # so no need to store the current turn of a board
+    turn_sign = round(turn/3)
+    encoded_board = [cell*turn_sign for cell in board_flat]
+
+    CELL_MAP = {
+        -3: 0,
+        -2: 1,
+        -1: 2,
+        1:  3,
+        2:  4,
+        3:  5,
+    }
+
+    # - storing the position of each "tick" rather than value of each cell
+    # So each tick can be stored in 3 bits, but in total the whole board is 3 bytes for easier access
+    location_arr = [0x0F for x in range(6)]
+    for i, cell in enumerate(encoded_board):
+        if cell in CELL_MAP:
+            location_arr[CELL_MAP[cell]] = i
+    
+    encoded_bytes = bytes([
+        (location_arr[0] << 4) | location_arr[1],
+        (location_arr[2] << 4) | location_arr[3],
+        (location_arr[4] << 4) | location_arr[5],
+    ])
+
+    return encoded_bytes
+
+
+TRANSFORMATION_MAPS = (
+    # (0, 1, 2, 3, 4, 5, 6, 7, 8), # 0: Identity
+    (2, 5, 8, 1, 4, 7, 0, 3, 6), # 1: Rotate 90  degrees CC
+    (8, 7, 6, 5, 4, 3, 2, 1, 0), # 2: Rotate 180 degrees CC
+    (6, 3, 0, 7, 4, 1, 8, 5, 2), # 3: Rotate 270 degrees CC
+    (2, 1, 0, 5, 4, 3, 8, 7, 6), # 4: Flip horizontally
+    (0, 3, 6, 1, 4, 7, 2, 5, 8), # 5: Flip Horizontally -> Rotate 90  CC (TL / BR Sym)
+    (6, 7, 8, 3, 4, 5, 0, 1, 2), # 6: Flip Horizontally -> Rotate 180 CC (Vertical Flip)
+    (8, 5, 2, 7, 4, 1, 6, 3, 0), # 7: Flip Horizontally -> Rotate 270 CC (TR / BL Sym)
+)
+
+def get_canonical_form(state):
+
+    # -- getting the canonical state form -- #
+    turn = state["turn"]
+    min_state_encoded = encodeState(flatten_board(state["board"]), turn)
+
+    for transform_map in TRANSFORMATION_MAPS:
+
+        flat_board = flatten_board(state["board"])
+        transformed_board = [flat_board[i] for i in transform_map]
+
+        transformed_state_encoded = encodeState(transformed_board, turn)
+
+        if transformed_state_encoded < min_state_encoded:
+            min_state_encoded = transformed_state_encoded
+
+    return min_state_encoded
+
+
 def result(state, action):
     """
     Returns the board that results from making move (i, j) on the board.
@@ -140,7 +206,7 @@ def BFS(initial_state):
     queue = collections.deque()
     depth = 0
 
-    states_list.add(hashBoard(initial_state))
+    states_list.add(get_canonical_form(initial_state))
     queue.append((initial_state, depth))
 
     while queue:
@@ -154,10 +220,10 @@ def BFS(initial_state):
         moves = get_moves(state)
         for move in moves:
             newstate = result(state, move)
-            if hashBoard(newstate) in states_list:
+            if get_canonical_form(newstate) in states_list:
                 continue
             else:
-                states_list.add(hashBoard(newstate))
+                states_list.add(get_canonical_form(newstate))
                 queue.append((newstate, depth+1))
                 print(len(states_list), depth+1)
 
@@ -291,6 +357,11 @@ if __name__ == "__main__":
     print(f"Generated {len(states_hash)} unique states.")
 
     scores, best_moves = evaluate_best_moves(states_hash)
+
+    initial_hash = hashBoard(initial_state())
+    pprint([
+        (move, scores[hashBoard(result(initial_state(), move))]) for move in get_moves(initial_state())
+    ])
 
     pprint([(scores[state_hash], state_hash, best_moves[state_hash]) for state_hash in states_hash if scores[state_hash] <= 100-17 and scores[state_hash] > 0])
 
