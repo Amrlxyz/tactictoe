@@ -73,10 +73,12 @@ def encodeState(board_flat, turn):
         if cell in CELL_MAP:
             location_arr[CELL_MAP[cell]] = i
     
+    # turn_sign = 1 if (turn_sign == 1) else 0
     encoded_bytes = bytes([
         (location_arr[0] << 4) | location_arr[1],
         (location_arr[2] << 4) | location_arr[3],
         (location_arr[4] << 4) | location_arr[5],
+        # turn_sign,
     ])
 
     return encoded_bytes
@@ -225,8 +227,9 @@ def BFS(initial_state):
             else:
                 states_list.add(get_canonical_form(newstate))
                 queue.append((newstate, depth+1))
-                print(len(states_list), depth+1)
+                # print(len(states_list), depth+1)
 
+    print(len(states_list), depth+1)
     return states_list
 
 
