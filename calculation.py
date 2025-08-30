@@ -297,7 +297,8 @@ def evaluate_best_moves(states_encoded):
     MIN_SCORE = -100
     DRAW_SCORE = 0
 
-    scores = {}
+    scores_min = {}
+    scores_max = {}
     
     # Create a lookup for the children of each state to avoid re-calculating
     children = {}
@@ -318,13 +319,16 @@ def evaluate_best_moves(states_encoded):
         # 1. Init scores
         state_winner = winner(state)
         if state_winner == X:
-            scores[state_encoded] = MAX_SCORE
-            print("winn")
+            scores_min[state_encoded] = MAX_SCORE
+            scores_max[state_encoded] = MAX_SCORE
+            # print("winn")
         elif state_winner == O:
-            scores[state_encoded] = MIN_SCORE
-            print("loss")
+            scores_min[state_encoded] = MIN_SCORE
+            scores_max[state_encoded] = MIN_SCORE
+            # print("loss")
         else:
-            scores[state_encoded] = DRAW_SCORE    
+            scores_min[state_encoded] = DRAW_SCORE
+            scores_max[state_encoded] = DRAW_SCORE
 
 
     # 2. Iteration until convergence
@@ -343,29 +347,54 @@ def evaluate_best_moves(states_encoded):
 
             # Get the current scores of all children states
             # Note: We use the scores from the *previous* iteration to calculate the new ones
-            child_scores = [scores[state_child_encoded] for state_child_encoded in state_children_encoded]
+            child_scores_min = [scores_min[state_child_encoded] for state_child_encoded in state_children_encoded]
+            child_scores_max = [scores_max[state_child_encoded] for state_child_encoded in state_children_encoded]
+            child_scores = child_scores_max + child_scores_min
             # pprint(child_scores)
 
             # Apply the minimax principle
-            best_child_score = 0
+            # best_child_score = 0
             # if decodeBoard(state_encoded)["turn"] == X:
             # if True:
             #     best_child_score = max(child_scores)
             # else:  # Turn is O
             #     best_child_score = min(child_scores)
-            best_child_score = min(child_scores)
+            # best_child_score = min(child_scores)
             
-            # Adjust the score based on depth
-            new_score = 0
-            if best_child_score > DRAW_SCORE:  # It's a path to a win
-                new_score = best_child_score - 1
-            elif best_child_score < DRAW_SCORE: # It's a path to a loss
-                new_score = best_child_score + 1
-            else: # It's a draw
-                new_score = DRAW_SCORE
+            # Get the new max out of all children
+            new_max = max(child_scores)
+            if new_max > DRAW_SCORE:
+                new_max -= 1
+            elif new_max < DRAW_SCORE:
+                new_max += 1
+            else:
+                new_max = 0
 
-            if scores[state_encoded] != new_score:
-                scores[state_encoded] = new_score
+
+            # Get the new min out of all children  
+            new_min = min(child_scores)
+            if new_min > DRAW_SCORE:
+                new_min -= 1
+            elif new_min < DRAW_SCORE:
+                new_min += 1
+            else:
+                new_min = 0
+
+            # # Adjust the score based on depth
+            # new_score = 0
+            # if best_child_score > DRAW_SCORE:  # It's a path to a win
+            #     new_score = best_child_score - 1
+            # elif best_child_score < DRAW_SCORE: # It's a path to a loss
+            #     new_score = best_child_score + 1
+            # else: # It's a draw
+            #     new_score = DRAW_SCORE
+
+            if scores_max[state_encoded] != new_max:
+                scores_max[state_encoded] = new_max
+                changes += 1
+
+            if scores_min[state_encoded] != new_min:
+                scores_min[state_encoded] = new_min
                 changes += 1
 
         print(f"Iteration {iteration_count} finished with {changes} updates.")
@@ -383,9 +412,10 @@ def evaluate_best_moves(states_encoded):
     # for hash_val in scores:
     #     best_moves[hash_val] = [hashDiff(hash_val, child_hash) for child_hash in children[hash_val] if scores[child_hash] == scores[hash_val] + 1]
             
-    pprint(max([score for _, score in scores.items()]))
+    pprint(max([score for _, score in scores_min.items() if score != 0]))
     
-    print(f"\nFound scores for {len(scores)} states.")
+    print(f"\nFound scores for {len(states_encoded)} states.")
+
     # You can now inspect the 'scores' dictionary for the optimal value of any state.
     # For example, to find the score of the initial empty board:
     initial_hash = hashBoard(initial_state())
