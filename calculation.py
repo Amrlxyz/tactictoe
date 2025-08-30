@@ -52,9 +52,6 @@ def flatten_board(board):
 
 def encodeState(board_flat, turn):
 
-    # - encode the current turn as if its always the +ve player move, 
-    # so no need to store the current turn of a board
-    # turn_sign = round(turn/3) * (-1)
     encoded_board = [cell for cell in board_flat]
 
     CELL_MAP = {
@@ -84,7 +81,7 @@ def encodeState(board_flat, turn):
     return encoded_bytes
 
 
-def decodeBoard(state_encoded):
+def decodeState(state_encoded):
 
     turn = X if (state_encoded[3] & 0x01 == 1) else O
     
@@ -113,7 +110,12 @@ def decodeBoard(state_encoded):
 
     board = [board_flat[i:i+3] for i in range(0, len(board_flat), 3)]
 
-    return board, turn
+    state = {
+        "board": board,
+        "turn" : turn,
+    }
+
+    return state
 
 
 TRANSFORMATION_MAPS = (
@@ -249,7 +251,6 @@ def BFS(initial_state):
         #     print(f"Turn: {state["turn"]}, Depth: {depth}")
 
         if winner(state) != 0:
-            print(f"State: {state}, Depth: {depth}, Winner: {winner(state)}")
             continue
 
         # if not in list, add to list and queue
@@ -275,9 +276,11 @@ def findDuplicates(states_encoded):
         if state_encoded in duplicates:
             continue
 
-        state, turn = decodeBoard(state_encoded)
+        state = decodeState(state_encoded)
+        board = state["board"]
+        turn = state["turn"]
         turn = X if turn == O else O
-        reversed_state = encodeState(flatten_board(state), turn)
+        reversed_state = encodeState(flatten_board(board), turn)
 
         if reversed_state in duplicates:
             continue
@@ -285,39 +288,9 @@ def findDuplicates(states_encoded):
             duplicates.add(state_encoded)
             duplicates.add(reversed_state)
     
-    print(len(duplicates))
+    print(f"Found {len(duplicates)/2} duplicate pairs (same board, diff turn)")
 
-    return
-
-
-
-
-def hashBoard(state):
-    
-    hash = [cell for row in state["board"] for cell in row]
-    hash.append(state["turn"])
-    hashable_version = tuple(hash)
-    
-    return hashable_version
-
-
-def hashToState(hash):
-    board = [list(hash[0:3]), list(hash[3:6]), list(hash[6:9])]
-    
-    return {
-        "board": board,
-        "turn" : hash[9]
-    }
-
-
-def hashDiff(hash1, hash2):
-    """
-    Returns move that changes hash1 to hash2
-    """
-    player = hash1[-1]
-    board_index = hash2.index(player)
-
-    return (board_index // 3, board_index % 3)
+    return duplicates
 
 
 def evaluate_best_moves(states_encoded):
@@ -326,38 +299,33 @@ def evaluate_best_moves(states_encoded):
     MIN_SCORE = -100
     DRAW_SCORE = 0
 
-    scores_min = {}
-    scores_max = {}
+    scores = {}
     
     # Create a lookup for the children of each state to avoid re-calculating
+    # children = {encoded_state: set((move1, child1), (move2, child2), ...)}
     children = {}
     for state_encoded in states_encoded:
 
-        board = decodeBoard(state_encoded)
-        state = {
-            "turn": X,
-            "board": board
-        }
+        state = decodeState(state_encoded)
+        # board = state["board"]
+        # turn = state["turn"]
+
         # Only calculate children for non-terminal states
         if winner(state) == 0:
-            children[state_encoded] = set([get_canonical_form(result(state, move)) for move in get_moves(state)])
+            children[state_encoded] = set([(move, get_canonical_form(result(state, move)["board"], result(state, move)["turn"])) for move in get_moves(state)])
         else:
             children[state_encoded] = set()
-
 
         # 1. Init scores
         state_winner = winner(state)
         if state_winner == X:
-            scores_min[state_encoded] = MAX_SCORE
-            scores_max[state_encoded] = MAX_SCORE
+            scores[state_encoded] = MAX_SCORE
             # print("winn")
         elif state_winner == O:
-            scores_min[state_encoded] = MIN_SCORE
-            scores_max[state_encoded] = MIN_SCORE
+            scores[state_encoded] = MIN_SCORE
             # print("loss")
         else:
-            scores_min[state_encoded] = DRAW_SCORE
-            scores_max[state_encoded] = DRAW_SCORE
+            scores[state_encoded] = DRAW_SCORE
 
 
     # 2. Iteration until convergence
@@ -370,59 +338,36 @@ def evaluate_best_moves(states_encoded):
         changes = 0
         
         # Go through every state that is not a terminal win/loss
-        for state_encoded, state_children_encoded in children.items():
-            if len(state_children_encoded) == 0:
+        for state_encoded, children_data in children.items():
+            if len(children_data) == 0:
                 continue
+
+            state_children_encoded = [data[1] for data in children_data]
 
             # Get the current scores of all children states
             # Note: We use the scores from the *previous* iteration to calculate the new ones
-            child_scores_min = [scores_min[state_child_encoded] for state_child_encoded in state_children_encoded]
-            child_scores_max = [scores_max[state_child_encoded] for state_child_encoded in state_children_encoded]
+            child_scores = [scores[state_child_encoded] for state_child_encoded in state_children_encoded]
             # pprint(child_scores)
 
             # Apply the minimax principle
-            # best_child_score = 0
-            # if decodeBoard(state_encoded)["turn"] == X:
-            # if True:
-            #     best_child_score = max(child_scores)
-            # else:  # Turn is O
-            #     best_child_score = min(child_scores)
-            # best_child_score = min(child_scores)
+            best_child_score = 0
+            if decodeState(state_encoded)["turn"] == X:
+                best_child_score = max(child_scores)
+            else:  # Turn is O
+                best_child_score = min(child_scores)
             
-            # Get the new max out of all children
-            new_max = max(child_scores_max)
-            if new_max > DRAW_SCORE:
-                new_max -= 1
-            elif new_max < DRAW_SCORE:
-                new_max += 1
-            else:
-                new_max = 0
 
+            # Adjust the score based on depth
+            new_score = 0
+            if best_child_score > DRAW_SCORE:  # It's a path to a win
+                new_score = best_child_score - 1
+            elif best_child_score < DRAW_SCORE: # It's a path to a loss
+                new_score = best_child_score + 1
+            else: # It's a draw
+                new_score = DRAW_SCORE
 
-            # Get the new min out of all children  
-            new_min = min(child_scores_min)
-            if new_min > DRAW_SCORE:
-                new_min -= 1
-            elif new_min < DRAW_SCORE:
-                new_min += 1
-            else:
-                new_min = 0
-
-            # # Adjust the score based on depth
-            # new_score = 0
-            # if best_child_score > DRAW_SCORE:  # It's a path to a win
-            #     new_score = best_child_score - 1
-            # elif best_child_score < DRAW_SCORE: # It's a path to a loss
-            #     new_score = best_child_score + 1
-            # else: # It's a draw
-            #     new_score = DRAW_SCORE
-
-            if scores_max[state_encoded] != new_max:
-                scores_max[state_encoded] = new_max
-                changes += 1
-
-            if scores_min[state_encoded] != new_min:
-                scores_min[state_encoded] = new_min
+            if scores[state_encoded] != new_score:
+                scores[state_encoded] = new_score
                 changes += 1
 
         print(f"Iteration {iteration_count} finished with {changes} updates.")
@@ -433,39 +378,63 @@ def evaluate_best_moves(states_encoded):
             print("Scores have converged. Halting.")
             break
 
+
+    # Normalize the scores
+    score_positive = min([score for score in scores.values() if score != 0 and score > 0])
+    score_negative = max([score for score in scores.values() if score != 0 and score < 0])
+    for state_encoded, score in scores.items():
+        if score > 0:
+            score = score - score_positive + 1
+        elif score < 0:
+            score = score - score_negative - 1
+        scores[state_encoded] = score
+    print(f"Max Score: {max(scores.values())}")
+    print(f"Min Score: {min(scores.values())}")
+
     # Store the new best moves
     best_moves = {}
-    # for hash_val in scores:
-    #     best_moves[hash_val] = [hashDiff(hash_val, child_hash) for child_hash in children[hash_val] if scores[child_hash] == scores[hash_val] + 1]
-    # for hash_val in scores:
-    #     best_moves[hash_val] = [hashDiff(hash_val, child_hash) for child_hash in children[hash_val] if scores[child_hash] == scores[hash_val] + 1]
-            
-    pprint(max([score for _, score in scores_min.items() if score != 0]))
-    
-    print(f"\nFound scores for {len(states_encoded)} states.")
+    for state_encoded, children_data in children.items():
+        if len(children_data) == 0:
+            continue
+        if decodeState(state_encoded)["turn"] == X:
+            best_moves[state_encoded] = [(move, scores[child]) for move, child in children_data if scores[child] == scores[state_encoded] + 1]
+        else:
+            best_moves[state_encoded] = [(move, scores[child]) for move, child in children_data if scores[child] == scores[state_encoded] - 1]
 
-    # You can now inspect the 'scores' dictionary for the optimal value of any state.
-    # For example, to find the score of the initial empty board:
-    initial_hash = hashBoard(initial_state())
-    print(f"Starting board optimal score: {MAX_SCORE - scores[initial_hash]}, Best Moves: {best_moves[initial_hash]}")
+    move_scores = {}
+    for state_encoded, children_data in children.items():
+        if len(children_data) == 0:
+            continue
+        move_scores[state_encoded] = [(move, scores[child], child) for move, child in children_data]
 
-    # pprint([move for move in best_moves if move == []])
-    # pprint([score for score in scores if score == 0])
+    print("")
+    print(f"Found scores for {len(states_encoded)} states")
+    print(f"Found best moves for {len(best_moves)} states")
+    print("")
 
-    return (scores, best_moves)
+    return (scores, move_scores, best_moves)
 
 
 if __name__ == "__main__":
     
-    states_hash = generate_states()
-    findDuplicates(states_hash)
+    states_encoded = generate_states()
+    scores, move_scores, best_moves = evaluate_best_moves(states_encoded)
 
-    scores, best_moves = evaluate_best_moves(states_hash)
+    board_flat = flatten_board(initial_state()["board"])
+    pprint([(score, decodeState(state)) for move, score, state in move_scores[encodeState(board_flat, X)]])
 
-    initial_hash = hashBoard(initial_state())
-    pprint([
-        (move, scores[hashBoard(result(initial_state(), move))]) for move in get_moves(initial_state())
-    ])
+    # Optimising the possible states to be stored
+    original_len = len(states_encoded)
 
-    pprint([(scores[state_hash], state_hash, best_moves[state_hash]) for state_hash in states_hash if scores[state_hash] <= 100-17 and scores[state_hash] > 0])
+    # 1 - remove terminal states
+    optimised_states = set([state for state in states_encoded if winner(decodeState(state)) != 0])
+    new_len = len(optimised_states)
+    print(f"Removed terminal states -> {original_len} to {new_len} (-{original_len - new_len})")
+
+    # 2 - find board duplicates but diff turns
+    duplicates = findDuplicates(states_encoded)
+
+
+
+
 
