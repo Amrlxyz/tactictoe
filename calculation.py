@@ -54,8 +54,8 @@ def encodeState(board_flat, turn):
 
     # - encode the current turn as if its always the +ve player move, 
     # so no need to store the current turn of a board
-    turn_sign = round(turn/3)
-    encoded_board = [cell*turn_sign for cell in board_flat]
+    # turn_sign = round(turn/3) * (-1)
+    encoded_board = [cell for cell in board_flat]
 
     CELL_MAP = {
         -3: 0,
@@ -78,7 +78,7 @@ def encodeState(board_flat, turn):
         (location_arr[0] << 4) | location_arr[1],
         (location_arr[2] << 4) | location_arr[3],
         (location_arr[4] << 4) | location_arr[5],
-        # turn_sign,
+        1 if (turn == X) else 0
     ])
 
     return encoded_bytes
@@ -86,6 +86,8 @@ def encodeState(board_flat, turn):
 
 def decodeBoard(state_encoded):
 
+    turn = X if (state_encoded[3] & 0x01 == 1) else O
+    
     location_arr = [
         state_encoded[0] >> 4,
         state_encoded[0] & 0x0F,
@@ -111,7 +113,7 @@ def decodeBoard(state_encoded):
 
     board = [board_flat[i:i+3] for i in range(0, len(board_flat), 3)]
 
-    return board
+    return board, turn
 
 
 TRANSFORMATION_MAPS = (
@@ -125,15 +127,14 @@ TRANSFORMATION_MAPS = (
     (8, 5, 2, 7, 4, 1, 6, 3, 0), # 7: Flip Horizontally -> Rotate 270 CC (TR / BL Sym)
 )
 
-def get_canonical_form(state):
+def get_canonical_form(board, turn):
 
     # -- getting the canonical state form -- #
-    turn = state["turn"]
-    min_state_encoded = encodeState(flatten_board(state["board"]), turn)
+    min_state_encoded = encodeState(flatten_board(board), turn)
 
     for transform_map in TRANSFORMATION_MAPS:
 
-        flat_board = flatten_board(state["board"])
+        flat_board = flatten_board(board)
         transformed_board = [flat_board[i] for i in transform_map]
 
         transformed_state_encoded = encodeState(transformed_board, turn)
@@ -238,29 +239,57 @@ def BFS(initial_state):
     queue = collections.deque()
     depth = 0
 
-    states_list.add(get_canonical_form(initial_state))
+    states_list.add(get_canonical_form(initial_state["board"], initial_state["turn"]))
     queue.append((initial_state, depth))
 
     while queue:
         # get a vertex from queue
         state, depth = queue.popleft()
+        # if depth == 2:
+        #     print(f"Turn: {state["turn"]}, Depth: {depth}")
 
         if winner(state) != 0:
+            print(f"State: {state}, Depth: {depth}, Winner: {winner(state)}")
             continue
 
         # if not in list, add to list and queue
         moves = get_moves(state)
         for move in moves:
             newstate = result(state, move)
-            if get_canonical_form(newstate) in states_list:
+            if get_canonical_form(newstate["board"], newstate["turn"]) in states_list:
                 continue
             else:
-                states_list.add(get_canonical_form(newstate))
+                states_list.add(get_canonical_form(newstate["board"], newstate["turn"]))
                 queue.append((newstate, depth+1))
                 # print(len(states_list), depth+1)
 
-    print(len(states_list), depth+1)
+    print(f"Total states: {len(states_list)}, Depth: {depth+1}")
     return states_list
+
+
+def findDuplicates(states_encoded):
+
+    duplicates = set()
+    
+    for state_encoded in states_encoded:
+        if state_encoded in duplicates:
+            continue
+
+        state, turn = decodeBoard(state_encoded)
+        turn = X if turn == O else O
+        reversed_state = encodeState(flatten_board(state), turn)
+
+        if reversed_state in duplicates:
+            continue
+        elif reversed_state in states_encoded:
+            duplicates.add(state_encoded)
+            duplicates.add(reversed_state)
+    
+    print(len(duplicates))
+
+    return
+
+
 
 
 def hashBoard(state):
@@ -349,7 +378,6 @@ def evaluate_best_moves(states_encoded):
             # Note: We use the scores from the *previous* iteration to calculate the new ones
             child_scores_min = [scores_min[state_child_encoded] for state_child_encoded in state_children_encoded]
             child_scores_max = [scores_max[state_child_encoded] for state_child_encoded in state_children_encoded]
-            child_scores = child_scores_max + child_scores_min
             # pprint(child_scores)
 
             # Apply the minimax principle
@@ -362,7 +390,7 @@ def evaluate_best_moves(states_encoded):
             # best_child_score = min(child_scores)
             
             # Get the new max out of all children
-            new_max = max(child_scores)
+            new_max = max(child_scores_max)
             if new_max > DRAW_SCORE:
                 new_max -= 1
             elif new_max < DRAW_SCORE:
@@ -372,7 +400,7 @@ def evaluate_best_moves(states_encoded):
 
 
             # Get the new min out of all children  
-            new_min = min(child_scores)
+            new_min = min(child_scores_min)
             if new_min > DRAW_SCORE:
                 new_min -= 1
             elif new_min < DRAW_SCORE:
@@ -430,7 +458,7 @@ def evaluate_best_moves(states_encoded):
 if __name__ == "__main__":
     
     states_hash = generate_states()
-    print(f"Generated {len(states_hash)} unique states.")
+    findDuplicates(states_hash)
 
     scores, best_moves = evaluate_best_moves(states_hash)
 
