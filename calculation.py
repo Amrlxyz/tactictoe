@@ -50,9 +50,9 @@ def flatten_board(board):
     return [cell for row in board for cell in row]
 
 
-def encodeState(board_flat, turn):
-
-    encoded_board = [cell for cell in board_flat]
+def boardToPosition(board_flat):
+    # - storing the position of each "tick" rather than value of each cell
+    # So each tick can be stored in 3 bits, but in total the whole board is 3 bytes for easier access
 
     CELL_MAP = {
         -3: 0,
@@ -63,13 +63,18 @@ def encodeState(board_flat, turn):
         3:  5,
     }
 
-    # - storing the position of each "tick" rather than value of each cell
-    # So each tick can be stored in 3 bits, but in total the whole board is 3 bytes for easier access
     location_arr = [0x0F for x in range(6)]
-    for i, cell in enumerate(encoded_board):
+    for i, cell in enumerate(board_flat):
         if cell in CELL_MAP:
             location_arr[CELL_MAP[cell]] = i
-    
+
+    return location_arr
+
+
+def encodeState(board_flat, turn):
+
+    location_arr = boardToPosition(board_flat) 
+
     # turn_sign = 1 if (turn_sign == 1) else 0
     encoded_bytes = bytes([
         (location_arr[0] << 4) | location_arr[1],
@@ -270,10 +275,11 @@ def BFS(initial_state):
 
 def findDuplicates(states_encoded):
 
+    duplicates_pair = set()
     duplicates = set()
     
     for state_encoded in states_encoded:
-        if state_encoded in duplicates:
+        if state_encoded in duplicates_pair:
             continue
 
         state = decodeState(state_encoded)
@@ -282,13 +288,18 @@ def findDuplicates(states_encoded):
         turn = X if turn == O else O
         reversed_state = encodeState(flatten_board(board), turn)
 
-        if reversed_state in duplicates:
+        if reversed_state in duplicates_pair:
             continue
         elif reversed_state in states_encoded:
-            duplicates.add(state_encoded)
-            duplicates.add(reversed_state)
+            duplicates_pair.add(state_encoded)
+            duplicates_pair.add(reversed_state)
+            # gather the state that is O to be removed so that X states with X turn is kept
+            if state["turn"] == O:
+                duplicates.add(state_encoded)
+            else:
+                duplicates.add(reversed_state)
     
-    print(f"Found {len(duplicates)/2} duplicate pairs (same board, diff turn)")
+    print(f"Found {len(duplicates_pair)} duplicate pairs (same board, diff turn)")
 
     return duplicates
 
@@ -307,8 +318,6 @@ def evaluate_best_moves(states_encoded):
     for state_encoded in states_encoded:
 
         state = decodeState(state_encoded)
-        # board = state["board"]
-        # turn = state["turn"]
 
         # Only calculate children for non-terminal states
         if winner(state) == 0:
@@ -401,6 +410,8 @@ def evaluate_best_moves(states_encoded):
         else:
             best_moves[state_encoded] = [(move, scores[child]) for move, child in children_data if scores[child] == scores[state_encoded] - 1]
 
+    pprint(best_moves)
+
     move_scores = {}
     for state_encoded, children_data in children.items():
         if len(children_data) == 0:
@@ -415,6 +426,47 @@ def evaluate_best_moves(states_encoded):
     return (scores, move_scores, best_moves)
 
 
+
+def storeMoves(states_encoded, states_duplicate, best_moves):
+    
+    encoded_moves = set()
+
+    for state_encoded in states_encoded:
+        state = decodeState(state_encoded)
+        board_flat = flatten_board(state["board"])
+        turn = state["turn"]
+
+        location_arr = boardToPosition(board_flat)
+
+        if (state_encoded in states_duplicate):
+            if (turn == O):
+                raise KeyError  # the duplicates thats left should only be X's turn
+            best_move_x = best_moves[state_encoded][0]
+            state_o = encodeState(board_flat, O)
+            best_move_o = best_moves[state_o][0]
+
+        elif (turn == X):
+            pprint(best_moves[state_encoded])
+            best_move_x = best_moves[state_encoded][0]
+            best_move_o = 0x0F
+
+        elif (turn == O):
+            best_move_x = 0x0F
+            best_move_o = best_moves[state_encoded][0]
+
+
+        encoded_bytes = bytes([
+            (location_arr[0] << 4) | location_arr[1],
+            (location_arr[2] << 4) | location_arr[3],
+            (location_arr[4] << 4) | location_arr[5],
+            (    best_move_x << 4) | best_move_o,
+        ])
+
+        encoded_moves.add(encoded_bytes)
+    
+    return encoded_moves
+
+
 if __name__ == "__main__":
     
     states_encoded = generate_states()
@@ -423,16 +475,48 @@ if __name__ == "__main__":
     board_flat = flatten_board(initial_state()["board"])
     pprint([(score, decodeState(state)) for move, score, state in move_scores[encodeState(board_flat, X)]])
 
-    # Optimising the possible states to be stored
-    original_len = len(states_encoded)
 
+    # Optimising the amount of states to be stored
+    print("")
+    print("Optimising...")
+    
     # 1 - remove terminal states
-    optimised_states = set([state for state in states_encoded if winner(decodeState(state)) != 0])
+    original_len = len(states_encoded)
+    optimised_states = set([state for state in states_encoded if winner(decodeState(state)) == 0])
     new_len = len(optimised_states)
-    print(f"Removed terminal states -> {original_len} to {new_len} (-{original_len - new_len})")
+    print(f"1. Removed terminal states -> {original_len} to {new_len} (-{original_len - new_len})")
 
     # 2 - find board duplicates but diff turns
-    duplicates = findDuplicates(states_encoded)
+    original_len = len(optimised_states)
+    duplicates = findDuplicates(optimised_states)
+    for duplicate in duplicates:
+        optimised_states.remove(duplicate)
+    new_len = len(optimised_states)
+    print(f"2. Removed duplicate states -> {original_len} to {new_len} (-{original_len - new_len})")
+
+
+    # pprint([decodeState(state) for state in optimised_states if scores[state] == 17])
+
+    # 3 - remove the states that is {depth} moves from winning
+    depth_to_remove = 7
+    for depth in range(depth_to_remove+1):
+        original_len = len(optimised_states)
+        state_to_remove = set()
+        for state in optimised_states:
+            state_score = scores[state]
+            if state_score >= 18-depth or state_score <= -18+depth:
+                state_to_remove.add(state)
+        for state in state_to_remove:
+            optimised_states.remove(state)
+        new_len = len(optimised_states)
+        print(f"3.{depth} Removed states that is {depth} moves to winning -> {original_len} to {new_len} (-{original_len - new_len})")
+
+    print("Storing best moves to the 4 bytes")
+    encoded_best_moves = storeMoves(optimised_states, duplicates, best_moves)
+
+    # pprint([decodeState(state) for state in optimised_states if scores[state] == 17])
+
+
 
 
 
