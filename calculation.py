@@ -524,6 +524,63 @@ def calculate():
     return (states_encoded, scores, move_scores, best_moves)
 
 
+def export_to_c(bytes: list[bytes], var_name: str, filename: str):
+    """
+    Exports a list of bytes objects as a C header file
+    """
+    try:
+        with open(filename, 'w') as f:
+            # 1. Header Guard
+            # Creates a unique guard to prevent multiple inclusion errors.
+            header_guard = f"___{filename.upper().replace('.', '_')}___"
+            f.write(f"#ifndef {header_guard}\n")
+            f.write(f"#define {header_guard}\n\n")
+
+            # 2. Include necessary headers
+            f.write("#include <stdint.h> // For uint8_t\n")
+            f.write("#include <stddef.h> // For size_t\n\n")
+
+            f.write("// First 3 bytes represents the state, last byte is the best move \n")
+            f.write("// The array is pre-sorted (big-endian) \n")
+
+            # 3. Write the array definition
+            num_rows = len(bytes)
+            # Using 'static const' is good practice for constant data in headers.
+            # The empty [] for rows lets the compiler calculate the size automatically.
+            f.write(f"static const uint8_t {var_name}[][4] = {{\n")
+
+            for i, byte_obj in enumerate(bytes):
+                if len(byte_obj) != 4:
+                    raise ValueError(f"Error: Byte object at index {i} has length {len(byte_obj)}, expected 4.")
+                
+                # Format each byte as a two-digit hex string, e.g., "0xde"
+                hex_values = [f"0x{b:02x}" for b in byte_obj]
+                
+                # Join them into a C-style array row
+                f.write(f"    {{ {', '.join(hex_values)} }}")
+                
+                # Add a comma if it's not the last row
+                if i < num_rows - 1:
+                    f.write(",")
+                f.write("\n")
+
+            f.write("};\n\n")
+
+            # 4. (Optional but Recommended) Add a size variable
+            # This makes it easy to loop over the array in C without hardcoding its size.
+            f.write(f"static const size_t {var_name}_size = {num_rows};\n\n")
+
+            # 5. Close the header guard
+            f.write(f"#endif // {header_guard}\n")
+
+        print(f"Successfully exported data to '{filename}'")
+
+    except IOError as e:
+        print(f"Error writing to file: {e}")
+    except ValueError as e:
+        print(f"{e}")
+
+
 if __name__ == "__main__":
     
     states_encoded, scores, move_scores, best_moves = calculate()
@@ -540,6 +597,7 @@ if __name__ == "__main__":
     pprint([int.from_bytes(val, "big") for val in encoded_best_moves[-10:]])
 
     # todo: export bytes to C
+    export_to_c(encoded_best_moves, "precalculatedMoves", "tactictoe_states.h")
 
 
 
