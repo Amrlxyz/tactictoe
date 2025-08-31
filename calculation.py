@@ -419,8 +419,6 @@ def evaluate_best_moves(states_encoded):
             pprint((decodeState(state_encoded)["board"], scores[state_encoded], [scores[child[1]] for child in children_data]))
             raise ValueError
 
-    pprint(best_moves)
-
     move_scores = {}
     for state_encoded, children_data in children.items():
         if len(children_data) == 0:
