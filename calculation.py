@@ -49,6 +49,9 @@ def get_moves(state):
 def flatten_board(board):
     return [cell for row in board for cell in row]
 
+def flatten_move(move: tuple[int, int]):
+    # (col, row)
+    return move[0]*3 + move[1]
 
 def boardToPosition(board_flat):
     # - storing the position of each "tick" rather than value of each cell
@@ -231,15 +234,6 @@ def terminal(state):
     return False
 
 
-def generate_states():
-
-    starting_state = initial_state()
-
-    states = BFS(starting_state)
-
-    return states
-
-
 def BFS(initial_state):
 
     states_list = set()
@@ -405,10 +399,25 @@ def evaluate_best_moves(states_encoded):
     for state_encoded, children_data in children.items():
         if len(children_data) == 0:
             continue
+        # if scores[state_encoded] != 0:
+        #     if decodeState(state_encoded)["turn"] == X:
+        #         best_move_score = scores[state_encoded] + 1
+        #     else:
+        #         best_move_score = scores[state_encoded] - 1
+        # else:
+        #     # if in drawing state, get the move that results in the max or min (this must just be 0, which is the reason its draw)
         if decodeState(state_encoded)["turn"] == X:
-            best_moves[state_encoded] = [(move, scores[child]) for move, child in children_data if scores[child] == scores[state_encoded] + 1]
+            best_move_score = max([scores[child[1]] for child in children_data])
         else:
-            best_moves[state_encoded] = [(move, scores[child]) for move, child in children_data if scores[child] == scores[state_encoded] - 1]
+            best_move_score = min([scores[child[1]] for child in children_data]) 
+
+        best_moves[state_encoded] = [move for move, child in children_data if scores[child] == best_move_score]
+
+        # sanity check that there must be atleast one best move for each state
+        if len(best_moves[state_encoded]) == 0:
+            pprint((best_moves[state_encoded], best_move_score, decodeState(state_encoded)["turn"]))
+            pprint((decodeState(state_encoded)["board"], scores[state_encoded], [scores[child[1]] for child in children_data]))
+            raise ValueError
 
     pprint(best_moves)
 
@@ -429,7 +438,7 @@ def evaluate_best_moves(states_encoded):
 
 def storeMoves(states_encoded, states_duplicate, best_moves):
     
-    encoded_moves = set()
+    encoded_moves = list()
 
     for state_encoded in states_encoded:
         state = decodeState(state_encoded)
@@ -441,19 +450,17 @@ def storeMoves(states_encoded, states_duplicate, best_moves):
         if (state_encoded in states_duplicate):
             if (turn == O):
                 raise KeyError  # the duplicates thats left should only be X's turn
-            best_move_x = best_moves[state_encoded][0]
+            best_move_x = flatten_move(best_moves[state_encoded][0])
             state_o = encodeState(board_flat, O)
-            best_move_o = best_moves[state_o][0]
+            best_move_o = flatten_move(best_moves[state_o][0])
 
         elif (turn == X):
-            pprint(best_moves[state_encoded])
-            best_move_x = best_moves[state_encoded][0]
+            best_move_x = flatten_move(best_moves[state_encoded][0])
             best_move_o = 0x0F
 
         elif (turn == O):
             best_move_x = 0x0F
-            best_move_o = best_moves[state_encoded][0]
-
+            best_move_o = flatten_move(best_moves[state_encoded][0])
 
         encoded_bytes = bytes([
             (location_arr[0] << 4) | location_arr[1],
@@ -462,20 +469,12 @@ def storeMoves(states_encoded, states_duplicate, best_moves):
             (    best_move_x << 4) | best_move_o,
         ])
 
-        encoded_moves.add(encoded_bytes)
+        encoded_moves.append(encoded_bytes)
     
     return encoded_moves
 
 
-if __name__ == "__main__":
-    
-    states_encoded = generate_states()
-    scores, move_scores, best_moves = evaluate_best_moves(states_encoded)
-
-    board_flat = flatten_board(initial_state()["board"])
-    pprint([(score, decodeState(state)) for move, score, state in move_scores[encodeState(board_flat, X)]])
-
-
+def optimizeSize(states_encoded, scores, move_scores, best_moves):
     # Optimising the amount of states to be stored
     print("")
     print("Optimising...")
@@ -494,9 +493,6 @@ if __name__ == "__main__":
     new_len = len(optimised_states)
     print(f"2. Removed duplicate states -> {original_len} to {new_len} (-{original_len - new_len})")
 
-
-    # pprint([decodeState(state) for state in optimised_states if scores[state] == 17])
-
     # 3 - remove the states that is {depth} moves from winning
     depth_to_remove = 7
     for depth in range(depth_to_remove+1):
@@ -511,10 +507,39 @@ if __name__ == "__main__":
         new_len = len(optimised_states)
         print(f"3.{depth} Removed states that is {depth} moves to winning -> {original_len} to {new_len} (-{original_len - new_len})")
 
-    print("Storing best moves to the 4 bytes")
+    # Store the optimised states with best moves into 4 bytes
+    print("")
+    print(f"Encoding the {len(optimised_states)} best moves into 4 bytes...")
     encoded_best_moves = storeMoves(optimised_states, duplicates, best_moves)
 
-    # pprint([decodeState(state) for state in optimised_states if scores[state] == 17])
+    return encoded_best_moves
+
+
+def calculate():
+
+    starting_state = initial_state()
+    states_encoded = BFS(starting_state)
+    scores, move_scores, best_moves = evaluate_best_moves(states_encoded)
+
+    return (states_encoded, scores, move_scores, best_moves)
+
+
+if __name__ == "__main__":
+    
+    states_encoded, scores, move_scores, best_moves = calculate()
+
+    pprint("Example Initial State")
+    board_flat = flatten_board(initial_state()["board"])
+    pprint([(score, move, decodeState(state)) for move, score, state in move_scores[encodeState(board_flat, X)]])
+
+    # Optimise the size of the states into bytes
+    encoded_best_moves = optimizeSize(states_encoded, scores, move_scores, best_moves)
+
+    encoded_best_moves = sorted(encoded_best_moves)
+    pprint([val.hex() for val in encoded_best_moves[-10:]])
+    pprint([int.from_bytes(val, "big") for val in encoded_best_moves[-10:]])
+
+    # todo: export bytes to C
 
 
 
