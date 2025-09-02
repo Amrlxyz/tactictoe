@@ -143,19 +143,6 @@ def terminal(state):
     return False
 
 
-def utility(state, depth):
-    """
-    Returns the value of the board, also based on depth the of the search (higher depth means less steps to get to the position)
-    """
-    winPlayer = winner(state)
-    if winPlayer == X:
-        return 1 * depth
-    elif winPlayer == O:
-        return -1 * depth 
-    else:
-        return 0
-
-
 # callcount variable to track how many times eval() is called
 callcount = 0
 
@@ -189,4 +176,20 @@ def getRandomMove(state):
     print(f"Eval Score: {scores[state_encoded]}")
 
     return random.choice(list(actions(state)))
+
+
+def getStateScore(state):
+
+    win_ner = winner(state)
+    if win_ner == None:
+        state_encoded = clc.get_canonical_form(state["board"], state["turn"])
+        return str(scores[state_encoded])
     
+    elif win_ner == X:
+        return "WIN_X"
+    
+    elif win_ner == O:
+        return "WIN_O"
+
+    else:
+        return ""

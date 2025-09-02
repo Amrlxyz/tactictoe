@@ -6,8 +6,8 @@ import time
 import tactictoe_precalculated as ttt
 
 ttt.init()
-MOVE_DELAY = 0.1
-RESET_DELAY = 0.5
+MOVE_DELAY = 2
+RESET_DELAY = 2
 
 pygame.init()
 size = width, height = 600, 400
@@ -18,6 +18,7 @@ white = (255, 255, 255)
 
 screen = pygame.display.set_mode(size)
 
+smallFont = pygame.font.Font("OpenSans-Regular.ttf", 12)
 mediumFont = pygame.font.Font("OpenSans-Regular.ttf", 28)
 largeFont = pygame.font.Font("OpenSans-Regular.ttf", 40)
 moveFont = pygame.font.Font("OpenSans-Regular.ttf", 60)
@@ -25,6 +26,7 @@ moveFont = pygame.font.Font("OpenSans-Regular.ttf", 60)
 user = None
 state = ttt.initial_state()
 ai_turn = False
+game_over = False
 
 while True:
 
@@ -87,8 +89,35 @@ while True:
                 )
                 pygame.draw.rect(screen, white, rect, 3)
 
+                padding = 7 # Pixels to push numbers away from the borders
+                # --- Display number in bottom-left ---
+                if state["board"][i][j] == ttt.EMPTY:
+                    # Render the text
+                    move_score_str = ttt.getStateScore(ttt.result(state, (i, j)))
+                    left_num_surface = smallFont.render(move_score_str, True, white)
+                    # Get the rectangle of the rendered text
+                    left_num_rect = left_num_surface.get_rect()
+                    # Position the text's rectangle in the bottom-left of the cell
+                    left_num_rect.bottomleft = (rect.left + padding, rect.bottom - padding)
+                    # Draw it on the screen
+                    screen.blit(left_num_surface, left_num_rect)
+
+                # --- Display number in bottom-right ---
                 if state["board"][i][j] != ttt.EMPTY:
-                    move = moveFont.render(str(state["board"][i][j]), True, white)
+                    # Render the text
+                    right_num_surface = smallFont.render(str(state["board"][i][j]), True, white)
+                    # Get the rectangle of the rendered text
+                    right_num_rect = right_num_surface.get_rect()
+                    # Position the text's rectangle in the bottom-right of the cell
+                    right_num_rect.bottomright = (rect.right - padding, rect.bottom - padding)
+                    # Draw it on the screen
+                    screen.blit(right_num_surface, right_num_rect)
+
+                if state["board"][i][j] != ttt.EMPTY:
+                    if state["board"][i][j] > 0:
+                        move = moveFont.render("X", True, white)
+                    else:
+                        move = moveFont.render("O", True, white)
                     moveRect = move.get_rect()
                     moveRect.center = rect.center
                     screen.blit(move, moveRect)
@@ -101,10 +130,16 @@ while True:
         # Show title
         if game_over:
             winner = ttt.winner(state)
+            if winner == ttt.X:
+                winner_str = "X"
+            else:
+                winner_str = "O"
+            print(f"GAME OVER - Winner: {winner_str}")
             if winner is None:
                 title = f"Game Over: Tie."
             else:
-                title = f"Game Over: {winner} wins."
+                title = f"Game Over: {winner_str} wins."
+
         elif user == player:
             title = f"Computer 1 thinking..."
         else:
@@ -119,7 +154,7 @@ while True:
         # if not game_over:
             if ai_turn:
                 time.sleep(MOVE_DELAY)
-                move = ttt.getRandomMove(state)
+                move = ttt.getBestMove(state)
                 state = ttt.result(state, move)
                 # Evaluate Next Move:
                 # print(" ")
@@ -135,7 +170,7 @@ while True:
         if user == player and not game_over:
             # AI vs AI
             time.sleep(MOVE_DELAY)
-            move = ttt.getRandomMove(state)
+            move = ttt.getBestMove(state)
             state = ttt.result(state, move)
             # Player vs AI
             # mouse = pygame.mouse.get_pos()
@@ -144,20 +179,21 @@ while True:
             #         if (board[i][j] == ttt.EMPTY and tiles[i][j].collidepoint(mouse)):
             #             board = ttt.result(board, (i, j))
 
-        if game_over:
-            againButton = pygame.Rect(width / 3, height - 65, width / 3, 50)
-            again = mediumFont.render("Play Again", True, black)
-            againRect = again.get_rect()
-            againRect.center = againButton.center
-            pygame.draw.rect(screen, white, againButton)
-            screen.blit(again, againRect)
-            # click, _, _ = pygame.mouse.get_pressed()
-            # if click == 1:
-            #     mouse = pygame.mouse.get_pos()
-            #     if againButton.collidepoint(mouse):
-            time.sleep(RESET_DELAY)
-            user = None
-            state = ttt.initial_state()
-            ai_turn = False
-
     pygame.display.flip()
+
+    if game_over:
+        # againButton = pygame.Rect(width / 3, height - 65, width / 3, 50)
+        # again = mediumFont.render("Play Again", True, black)
+        # againRect = again.get_rect()
+        # againRect.center = againButton.center
+        # pygame.draw.rect(screen, white, againButton)
+        # screen.blit(again, againRect)
+        # click, _, _ = pygame.mouse.get_pressed()
+        # if click == 1:
+        #     mouse = pygame.mouse.get_pos()
+        #     if againButton.collidepoint(mouse):
+        time.sleep(RESET_DELAY)
+        user = None
+        state = ttt.initial_state()
+        ai_turn = False
+        game_over = False
