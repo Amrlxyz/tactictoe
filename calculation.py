@@ -1,11 +1,23 @@
 
 import collections
+import json
 from copy import deepcopy
 from pprint import pprint
 
 X = 3
 O = -3
 EMPTY = 0
+
+TRANSFORMATION_MAPS = (
+    # (0, 1, 2, 3, 4, 5, 6, 7, 8), # 0: Identity
+    (2, 5, 8, 1, 4, 7, 0, 3, 6), # 1: Rotate 90  degrees CC
+    (8, 7, 6, 5, 4, 3, 2, 1, 0), # 2: Rotate 180 degrees CC
+    (6, 3, 0, 7, 4, 1, 8, 5, 2), # 3: Rotate 270 degrees CC
+    (2, 1, 0, 5, 4, 3, 8, 7, 6), # 4: Flip horizontally
+    (0, 3, 6, 1, 4, 7, 2, 5, 8), # 5: Flip Horizontally -> Rotate 90  CC (TL / BR Sym)
+    (6, 7, 8, 3, 4, 5, 0, 1, 2), # 6: Flip Horizontally -> Rotate 180 CC (Vertical Flip)
+    (8, 5, 2, 7, 4, 1, 6, 3, 0), # 7: Flip Horizontally -> Rotate 270 CC (TR / BL Sym)
+)
 
 validStates = [-3, -2, -1, 1, 2, 3]
 
@@ -126,16 +138,7 @@ def decodeState(state_encoded):
     return state
 
 
-TRANSFORMATION_MAPS = (
-    # (0, 1, 2, 3, 4, 5, 6, 7, 8), # 0: Identity
-    (2, 5, 8, 1, 4, 7, 0, 3, 6), # 1: Rotate 90  degrees CC
-    (8, 7, 6, 5, 4, 3, 2, 1, 0), # 2: Rotate 180 degrees CC
-    (6, 3, 0, 7, 4, 1, 8, 5, 2), # 3: Rotate 270 degrees CC
-    (2, 1, 0, 5, 4, 3, 8, 7, 6), # 4: Flip horizontally
-    (0, 3, 6, 1, 4, 7, 2, 5, 8), # 5: Flip Horizontally -> Rotate 90  CC (TL / BR Sym)
-    (6, 7, 8, 3, 4, 5, 0, 1, 2), # 6: Flip Horizontally -> Rotate 180 CC (Vertical Flip)
-    (8, 5, 2, 7, 4, 1, 6, 3, 0), # 7: Flip Horizontally -> Rotate 270 CC (TR / BL Sym)
-)
+
 
 def get_canonical_form(board, turn):
 
@@ -579,6 +582,31 @@ def export_to_c(bytes: list[bytes], var_name: str, filename: str):
         print(f"{e}")
 
 
+def export_to_json(scores: dict, best_moves, filename):
+
+    precomputed_data = {}
+
+    for state_encoded, score in scores.items():
+        key = int.from_bytes(state_encoded, "big")
+        precomputed_data[key] = {
+            "score": score,
+            "moves": best_moves[state_encoded] if (state_encoded in best_moves) else None
+        }
+
+    try:
+        with open(filename, 'w') as f:
+            # Python's json library will automatically convert the integer keys to strings.
+            json.dump(precomputed_data, f, indent=4)
+
+        print(f"Successfully exported {len(precomputed_data)} states to {filename}")
+
+    except IOError as e:
+        print(f"Error writing to file: {e}")
+    except ValueError as e:
+        print(f"{e}")
+
+
+
 if __name__ == "__main__":
     
     states_encoded, scores, move_scores, best_moves = calculate()
@@ -587,6 +615,10 @@ if __name__ == "__main__":
     board_flat = flatten_board(initial_state()["board"])
     pprint([(score, move, decodeState(state)) for move, score, state in move_scores[encodeState(board_flat, X)]])
 
+    # Export to json for web version
+    export_to_json(scores, best_moves, "tactictoe_states.json")
+
+
     # Optimise the size of the states into bytes
     encoded_best_moves = optimizeSize(states_encoded, scores, move_scores, best_moves)
 
@@ -594,7 +626,7 @@ if __name__ == "__main__":
     pprint([val.hex() for val in encoded_best_moves[-10:]])
     pprint([int.from_bytes(val, "big") for val in encoded_best_moves[-10:]])
 
-    # todo: export bytes to C
+    # Size optimized best moves for microcontroller
     export_to_c(encoded_best_moves, "precalculatedMoves", "tactictoe_states.h")
 
 
