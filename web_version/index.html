@@ -193,39 +193,48 @@
             const isX = currentPlayer === 'X';
             const currentMoves = isX ? playerXMoves : playerOMoves;
             
-            // 1. Determine the unique piece ID to place based on the new rule.
-            let pieceToPlace;
-            const moveCount = currentMoves.length;
-            if (isX) {
-                // X starts with 3 and counts down (3, 2, 1)
-                pieceToPlace = 3 - moveCount;
-            } else {
-                // O starts with -3 and counts up (-3, -2, -1)
-                pieceToPlace = -3 + moveCount;
-            }
-
-            // 2. Update state with the new unique piece
-            gameState[index] = pieceToPlace;
-            currentMoves.push(pieceToPlace);
-
-            // 3. Update the UI to show 'X' or 'O'
-            const cell = gameCells[index];
-            const cellContent = cell.querySelector('.cell-content');
-            cellContent.textContent = currentPlayer;
-            cellContent.classList.add(currentPlayer.toLowerCase());
-
-            // 4. Enforce the 3-mark limit by removing the OLDEST piece
-            if (currentMoves.length > 3) {
-                const oldestPieceId = currentMoves.shift(); // Get the oldest piece ID
-                // Find where the oldest piece is on the board and remove it
-                const oldestMoveIndex = gameState.indexOf(oldestPieceId);
-                if (oldestMoveIndex !== -1) {
-                    gameState[oldestMoveIndex] = 0; // Clear the cell in the state
-                    const oldestCell = gameCells[oldestMoveIndex];
-                    const oldestCellContent = oldestCell.querySelector('.cell-content');
-                    oldestCellContent.textContent = "";
-                    oldestCellContent.classList.remove('x', 'o');
+            if (currentMoves.length < 3) {
+                // --- PLACEMENT PHASE ---
+                // 1. Determine the unique piece ID to place.
+                let pieceToPlace;
+                const moveCount = currentMoves.length;
+                if (isX) {
+                    pieceToPlace = 3 - moveCount; // X plays 3, then 2, then 1
+                } else {
+                    pieceToPlace = -3 + moveCount; // O plays -3, then -2, then -1
                 }
+
+                // 2. Update state and UI for the new piece.
+                gameState[index] = pieceToPlace;
+                currentMoves.push(pieceToPlace);
+                
+                const cell = gameCells[index];
+                const cellContent = cell.querySelector('.cell-content');
+                cellContent.textContent = currentPlayer;
+                cellContent.classList.add(currentPlayer.toLowerCase());
+
+            } else {
+                // --- MOVE PHASE ---
+                // 1. Identify and remove the oldest piece from the moves list. This is the piece to move.
+                const pieceToMove = currentMoves.shift();
+                
+                // 2. Find its location on the board and clear that cell (both state and UI).
+                const fromIndex = gameState.indexOf(pieceToMove);
+                if (fromIndex !== -1) {
+                    gameState[fromIndex] = 0;
+                    const fromCell = gameCells[fromIndex];
+                    fromCell.querySelector('.cell-content').textContent = "";
+                    fromCell.querySelector('.cell-content').classList.remove('x', 'o');
+                }
+
+                // 3. Place that same piece in the new location (both state and UI).
+                gameState[index] = pieceToMove;
+                const toCell = gameCells[index];
+                toCell.querySelector('.cell-content').textContent = currentPlayer;
+                toCell.querySelector('.cell-content').classList.add(currentPlayer.toLowerCase());
+                
+                // 4. Add the piece back to the end of the moves list, as it is now the newest piece.
+                currentMoves.push(pieceToMove);
             }
             
             handleResultValidation();
@@ -261,9 +270,16 @@
             if (clearAll) return;
 
             const nextPlayerMoves = currentPlayer === 'X' ? playerXMoves : playerOMoves;
+            
+            // Check if the NEXT player will be in the "move phase"
             if (nextPlayerMoves.length === 3) {
-                const oldestMoveIndex = nextPlayerMoves[0];
-                gameCells[oldestMoveIndex].querySelector('.cell-content').classList.add('next-to-remove');
+                // CORRECTED: Find the board index of the oldest piece instead of using the piece ID as an index.
+                const oldestPieceId = nextPlayerMoves[0]; // Get the ID of the oldest piece
+                const oldestMoveIndex = gameState.indexOf(oldestPieceId); // Find its actual position on the board
+                
+                if (oldestMoveIndex !== -1) {
+                    gameCells[oldestMoveIndex].querySelector('.cell-content').classList.add('next-to-remove');
+                }
             }
         }
 
