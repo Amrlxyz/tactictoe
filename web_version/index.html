@@ -97,7 +97,7 @@
         // --- Game State Variables ---
         let gameActive = false;
         let currentPlayer = 'X';
-        let gameState = ["", "", "", "", "", "", "", "", ""];
+        let gameState = [0, 0, 0, 0, 0, 0, 0, 0, 0];
         let playerXMoves = [];
         let playerOMoves = [];
         let gameMode = 'pvp'; // 'pvp' or 'pva'
@@ -147,8 +147,9 @@
 
         function startGame() {
             gameActive = true;
-            currentPlayer = 'X'; // Game always starts with X
-            gameState = ["", "", "", "", "", "", "", "", ""];
+            currentPlayer = 'X';
+            // Initialize with 0 for empty cells
+            gameState = [0, 0, 0, 0, 0, 0, 0, 0, 0];
             playerXMoves = [];
             playerOMoves = [];
             statusDisplay.innerHTML = currentPlayerTurn();
@@ -173,8 +174,8 @@
             const clickedCell = clickedCellEvent.currentTarget;
             const clickedCellIndex = Array.from(gameCells).indexOf(clickedCell);
 
-            // Prevent move if cell is taken, game is inactive, or it's AI's turn
-            if (gameState[clickedCellIndex] !== "" || !gameActive || (gameMode === 'pva' && currentPlayer === aiPlayer)) {
+            // Prevent move if cell is taken (not 0), game is inactive, or it's AI's turn
+            if (gameState[clickedCellIndex] !== 0 || !gameActive || (gameMode === 'pva' && currentPlayer === aiPlayer)) {
                 return;
             }
 
@@ -185,28 +186,46 @@
             }
         }
 
-        function makeMove(index) {
-            if (gameState[index] !== "" || !gameActive) return;
 
-            // 1. Update state and UI for the new mark
-            gameState[index] = currentPlayer;
+        function makeMove(index) {
+            if (gameState[index] !== 0 || !gameActive) return;
+
+            const isX = currentPlayer === 'X';
+            const currentMoves = isX ? playerXMoves : playerOMoves;
+            
+            // 1. Determine the unique piece ID to place based on the new rule.
+            let pieceToPlace;
+            const moveCount = currentMoves.length;
+            if (isX) {
+                // X starts with 3 and counts down (3, 2, 1)
+                pieceToPlace = 3 - moveCount;
+            } else {
+                // O starts with -3 and counts up (-3, -2, -1)
+                pieceToPlace = -3 + moveCount;
+            }
+
+            // 2. Update state with the new unique piece
+            gameState[index] = pieceToPlace;
+            currentMoves.push(pieceToPlace);
+
+            // 3. Update the UI to show 'X' or 'O'
             const cell = gameCells[index];
             const cellContent = cell.querySelector('.cell-content');
             cellContent.textContent = currentPlayer;
             cellContent.classList.add(currentPlayer.toLowerCase());
 
-            // 2. Add move to the player's history
-            const currentMoves = currentPlayer === 'X' ? playerXMoves : playerOMoves;
-            currentMoves.push(index);
-
-            // 3. Enforce the 3-mark limit
+            // 4. Enforce the 3-mark limit by removing the OLDEST piece
             if (currentMoves.length > 3) {
-                const oldestMoveIndex = currentMoves.shift();
-                gameState[oldestMoveIndex] = "";
-                const oldestCell = gameCells[oldestMoveIndex];
-                const oldestCellContent = oldestCell.querySelector('.cell-content');
-                oldestCellContent.textContent = "";
-                oldestCellContent.classList.remove('x', 'o');
+                const oldestPieceId = currentMoves.shift(); // Get the oldest piece ID
+                // Find where the oldest piece is on the board and remove it
+                const oldestMoveIndex = gameState.indexOf(oldestPieceId);
+                if (oldestMoveIndex !== -1) {
+                    gameState[oldestMoveIndex] = 0; // Clear the cell in the state
+                    const oldestCell = gameCells[oldestMoveIndex];
+                    const oldestCellContent = oldestCell.querySelector('.cell-content');
+                    oldestCellContent.textContent = "";
+                    oldestCellContent.classList.remove('x', 'o');
+                }
             }
             
             handleResultValidation();
@@ -292,24 +311,31 @@
         ];
 
         /**
-         * Creates an array of piece locations for encoding.
-         * The first 3 positions are for player X, the next 3 for player O.
-         * Uses 0x0F (15) as a sentinel value for an unused piece slot.
-         * @param {string[]} playerXMoves - Array of indices for X's pieces.
-         * @param {string[]} playerOMoves - Array of indices for O's pieces.
-         * @returns {number[]} - A 6-element array of piece locations.
+         * CORRECTED: Translates the board state to a location array based on unique piece IDs.
+         * This now matches the Python implementation used to generate the JSON.
+         * @param {number[]} board_flat - The 9-element array representing the board (using numbers).
+         * @returns {number[]} A 6-element array of piece locations.
          */
-        function boardToPosition(playerXMoves, playerOMoves) {
-            const x_pos = [...playerXMoves];
-            const o_pos = [...playerOMoves];
+        function boardToPosition(board_flat) {
+            const CELL_MAP = {
+                '-3': 0, '-2': 1, '-1': 2,
+                '1': 3,  '2': 4,  '3': 5
+            };
 
-            // Pad with sentinel value if player has fewer than 3 pieces
-            while (x_pos.length < 3) x_pos.push(0x0F);
-            while (o_pos.length < 3) o_pos.push(0x0F);
+            // Initialize with the sentinel value 0x0F (15)
+            const location_arr = Array(6).fill(0x0F);
             
-            // The spec implies X's pieces followed by O's pieces
-            return [...x_pos, ...o_pos];
+            for (let i = 0; i < board_flat.length; i++) {
+                const cell = board_flat[i];
+                if (cell !== 0) { // If the cell is not empty
+                    const pieceId = cell.toString();
+                    const locationIndex = CELL_MAP[pieceId];
+                    location_arr[locationIndex] = i;
+                }
+            }
+            return location_arr;
         }
+
 
         /**
          * Encodes the board state and turn into a single 32-bit integer key.
@@ -319,18 +345,15 @@
          * @param {number} turn - The current player (1 for X, -1 for O).
          * @returns {number} The integer key representing the game state.
          */
-        function encodeState(playerXMoves, playerOMoves, turn) {
-            const location_arr = boardToPosition(playerXMoves, playerOMoves);
+        function encodeState(board_flat, turn) {
+            // This is the only function that needs boardToPosition
+            const location_arr = boardToPosition(board_flat);
 
             const byte0 = (location_arr[0] << 4) | location_arr[1];
             const byte1 = (location_arr[2] << 4) | location_arr[3];
             const byte2 = (location_arr[4] << 4) | location_arr[5];
             const byte3 = (turn === X) ? 1 : 0;
 
-            // Combine the 4 bytes into a single 32-bit integer
-            // Note: JavaScript bitwise operations are on signed 32-bit integers.
-            // The `>>> 0` at the end ensures the result is treated as an unsigned integer,
-            // which prevents issues with the sign bit if the first byte is > 127.
             return ((byte0 << 24) | (byte1 << 16) | (byte2 << 8) | byte3) >>> 0;
         }
 
@@ -356,70 +379,85 @@
                 byte2 >> 4,
                 byte2 & 0x0F,
             ];
+            
+            // NEW: Maps the location_arr index back to a unique piece ID
+            const CELL_MAP_REV = {
+                0: -3, 1: -2, 2: -1,
+                3: 1,  4: 2,  5: 3,
+            };
 
-            const playerXMoves = location_arr.slice(0, 3).filter(loc => loc !== 0x0F);
-            const playerOMoves = location_arr.slice(3, 6).filter(loc => loc !== 0x0F);
+            // CORRECTED: Create a numeric board state
+            const board_flat = Array(9).fill(0); // Use 0 for empty
+            let playerXMoves = [];
+            let playerOMoves = [];
 
-            const board_flat = Array(9).fill("");
-            playerXMoves.forEach(idx => board_flat[idx] = 'X');
-            playerOMoves.forEach(idx => board_flat[idx] = 'O');
+            location_arr.forEach((pos, index) => {
+                if (pos !== 0x0F) { // If the piece is on the board
+                    const pieceId = CELL_MAP_REV[index];
+                    board_flat[pos] = pieceId;
+                    // Reconstruct the move history for the simulation
+                    if (pieceId > 0) {
+                        playerXMoves.push(pieceId);
+                    } else {
+                        playerOMoves.push(pieceId);
+                    }
+                }
+            });
 
             return {
                 board: board_flat,
-                playerXMoves,
-                playerOMoves,
-                turn: turn === X ? 'X' : 'O',
+                playerXMoves: playerXMoves.sort(),
+                playerOMoves: playerOMoves.sort((a,b) => a - b),
+                turn: turn, // Return numeric turn
             };
         }
 
-
         /**
-         * Finds the canonical representation of a board state by checking all 8 symmetries.
-         * This ensures that rotated or flipped boards map to the same key.
-         * @param {string[]} board_flat - The 9-element array representing the board.
-         * @param {number[]} playerXMoves - Current X moves.
-         * @param {number[]} playerOMoves - Current O moves.
+         * CORRECTED: Finds the canonical representation and returns both the key
+         * and the transformation map used to achieve it.
+         * @param {number[]} board_flat - The 9-element array representing the board.
          * @param {number} turn - The current player (1 or -1).
-         * @returns {number} The smallest integer key representing the canonical form.
+         * @returns {object} An object containing the { key, transform }.
          */
-        function getCanonicalForm(board_flat, playerXMoves, playerOMoves, turn) {
-            let minStateEncoded = encodeState(playerXMoves, playerOMoves, turn);
+        function getCanonicalForm(board_flat, turn) {
+            let minStateEncoded = encodeState(board_flat, turn);
+            let bestTransform = TRANSFORMATION_MAPS[0]; // Start with the identity transform
 
             for (const transform_map of TRANSFORMATION_MAPS) {
-                // Create new move arrays based on the transformation map
-                const transformedXMoves = playerXMoves.map(pos => transform_map.indexOf(pos)).sort((a,b) => a-b);
-                const transformedOMoves = playerOMoves.map(pos => transform_map.indexOf(pos)).sort((a,b) => a-b);
+                // Create a new board based on the current transformation
+                const transformed_board = Array(9).fill(0);
+                for(let i = 0; i < 9; i++) {
+                    // Place the piece from the original board (board_flat[i])
+                    // into its new, transformed position (transform_map[i])
+                    transformed_board[transform_map[i]] = board_flat[i];
+                }
 
-                const transformedStateEncoded = encodeState(transformedXMoves, transformedOMoves, turn);
+                const transformedStateEncoded = encodeState(transformed_board, turn);
                 
                 if (transformedStateEncoded < minStateEncoded) {
                     minStateEncoded = transformedStateEncoded;
+                    bestTransform = transform_map; // Store the transform that gave the best key
                 }
             }
 
-            return minStateEncoded;
+            return { key: minStateEncoded, transform: bestTransform };
         }
 
         // --- AI Logic (Lookup Table) ---
 
         function aiMove() {
-            // Check if the precomputed moves have been loaded
             if (!precomputedMoves) {
                 console.log("AI is thinking... (or data is still loading)");
-                statusDisplay.innerHTML = "AI data loading...";
                 return;
             }
 
-            // findBestMoveFromJSON now returns a [from, to] array or null
-            const bestMoveArray = findBestMoveFromJSON(); 
+            // findBestMoveFromJSON now returns a single index or null.
+            const bestMoveIndex = findBestMoveFromJSON(); 
             
-            if (bestMoveArray) {
-                const [from, to] = bestMoveArray;
-                
-                // The existing makeMove function works perfectly, as it only needs
-                // the destination index ('to') to place the piece. It will
-                // automatically handle removing the oldest piece if necessary.
-                makeMove(to);
+            if (bestMoveIndex !== null && bestMoveIndex !== -1) {
+                // The makeMove function is all we need. It will place the piece
+                // and handle removing the oldest one if the player has 3 marks.
+                makeMove(bestMoveIndex);
 
                 if (gameActive) {
                     handlePlayerChange();
@@ -431,152 +469,112 @@
             }
         }
 
+        // /**
+        //  * Generates all possible moves for a player from the current state.
+        //  */
+        // function getAvailableMoves(boardState, player) {
+        //     const availableMoves = [];
+        //     const emptyCells = [];
+        //     const playerPieces = [];
+
+        //     // CORRECTED: Find empty cells (0) and the current player's pieces
+        //     boardState.forEach((cell, index) => {
+        //         if (cell === 0) {
+        //             emptyCells.push(index);
+        //         } else if ((player === 'X' && cell > 0) || (player === 'O' && cell < 0)) {
+        //             playerPieces.push(index);
+        //         }
+        //     });
+
+        //     if (playerPieces.length < 3) {
+        //         // Placement moves: from a non-existent spot (-1) to an empty cell.
+        //         emptyCells.forEach(to => {
+        //             availableMoves.push([-1, to]);
+        //         });
+        //     } else {
+        //         // Moving pieces: from an existing piece position to an empty cell.
+        //         playerPieces.forEach(from => {
+        //             emptyCells.forEach(to => {
+        //                 availableMoves.push([from, to]);
+        //             });
+        //         });
+        //     }
+        //     return availableMoves;
+        // }
+
+        // /**
+        //  * Simulates a move on a given state and returns the new numeric board state.
+        //  */
+        // function simulateMove(state, move, pieceIdToPlace) {
+        //     const [from, to] = move;
+            
+        //     const newGameState = [...state.board];
+        //     let currentMoves = pieceIdToPlace > 0 ? [...state.playerXMoves] : [...state.playerOMoves];
+
+        //     // Place the new piece
+        //     newGameState[to] = pieceIdToPlace;
+        //     currentMoves.push(pieceIdToPlace);
+
+        //     // If it was a move, clear the 'from' square
+        //     if (from !== -1) {
+        //         newGameState[from] = 0;
+        //     } 
+        //     // If it was a placement that resulted in more than 3 pieces, remove the oldest
+        //     else if (currentMoves.length > 3) {
+        //         const oldestPieceId = currentMoves.shift();
+        //         const oldestIndex = newGameState.indexOf(oldestPieceId);
+        //         if (oldestIndex !== -1) {
+        //             newGameState[oldestIndex] = 0;
+        //         }
+        //     }
+            
+        //     // We only need the resulting board for the canonical key calculation
+        //     return { newGameState };
+        // }
+
         /**
-         * NEW HELPER FUNCTION
-         * Generates all possible moves for a player from the current state.
-         * A move is represented as a [from, to] pair.
-         * For placements, 'from' is -1.
-         * @param {number[]} playerMoves - The list of current piece positions for the player.
-         * @param {string[]} boardState - The 9-element array of the board.
-         * @returns {number[][]} An array of possible moves, e.g., [[-1, 0], [2, 5]].
+         * CORRECTED: Finds the best placement index by mapping the move for the
+         * canonical board back to the original board.
          */
-        function getAvailableMoves(playerMoves, boardState) {
-            const availableMoves = [];
-            const emptyCells = [];
-            boardState.forEach((cell, index) => {
-                if (cell === "") {
-                    emptyCells.push(index);
-                }
-            });
-
-            if (playerMoves.length < 3) {
-                // Placement moves: from a non-existent spot (-1) to an empty cell.
-                emptyCells.forEach(to => {
-                    availableMoves.push([-1, to]);
-                });
-            } else {
-                // Moving pieces: from an existing piece to an empty cell.
-                playerMoves.forEach(from => {
-                    emptyCells.forEach(to => {
-                        availableMoves.push([from, to]);
-                    });
-                });
-            }
-            return availableMoves;
-        }
-
-        /**
-         * NEW HELPER FUNCTION
-         * Simulates a move on a given state and returns the new state without
-         * modifying the original. Used for checking outcomes.
-         * @param {object} state - The current state { gameState, playerXMoves, playerOMoves }.
-         * @param {number[]} move - The move to simulate [from, to].
-         * @param {string} player - The player making the move ('X' or 'O').
-         * @returns {object} The new state after the move { newGameState, newPlayerXMoves, newPlayerOMoves }.
-         */
-        function simulateMove(state, move, player) {
-            const [from, to] = move;
-            
-            // Create copies to avoid mutating the original state
-            const newGameState = [...state.gameState];
-            let newPlayerXMoves = [...state.playerXMoves];
-            let newPlayerOMoves = [...state.playerOMoves];
-
-            // Place the new piece
-            newGameState[to] = player;
-            
-            // Remove the old piece if it was a move (not a placement)
-            if (from !== -1) {
-                newGameState[from] = "";
-            }
-
-            // Update the correct player's move list
-            if (player === 'X') {
-                newPlayerXMoves.push(to);
-                if (from !== -1) {
-                    newPlayerXMoves = newPlayerXMoves.filter(pos => pos !== from);
-                } else if (newPlayerXMoves.length > 3) {
-                    const oldestMove = newPlayerXMoves.shift();
-                    newGameState[oldestMove] = "";
-                }
-            } else { // Player is 'O'
-                newPlayerOMoves.push(to);
-                if (from !== -1) {
-                    newPlayerOMoves = newPlayerOMoves.filter(pos => pos !== from);
-                } else if (newPlayerOMoves.length > 3) {
-                    const oldestMove = newPlayerOMoves.shift();
-                    newGameState[oldestMove] = "";
-                }
-            }
-            
-            return { newGameState, newPlayerXMoves, newPlayerOMoves };
-        }
-
         function findBestMoveFromJSON() {
-            // 1. Get the canonical key for the current (original) state.
+            // 1. Get the canonical key and the transformation used to get there.
             const turn = (currentPlayer === 'X') ? X : O;
-            const canonicalKey = getCanonicalForm(gameState, playerXMoves, playerOMoves, turn);
+            const canonicalData = getCanonicalForm(gameState, turn);
+            const { key, transform } = canonicalData;
 
-            const canonicalMoveData = precomputedMoves[canonicalKey];
-            if (!canonicalMoveData || canonicalMoveData.moves.length === 0) {
-                console.error("No moves found for canonical key:", canonicalKey);
-                return null; // Return null if no move is found
+            const moveData = precomputedMoves[key];
+            if (!moveData || moveData.moves.length === 0) {
+                console.error("No moves found for canonical key:", key);
+                return null;
             }
 
-            // 2. Get the best canonical move and the resulting target canonical state.
-            // Randomly choose one of the best moves from the JSON data.
-            const bestCanonicalMove = canonicalMoveData.moves[Math.floor(Math.random() * canonicalMoveData.moves.length)];
-            const canonicalStateDecoded = decodeState(canonicalKey);
-            const nextPlayer = turn === X ? O : X;
+            // 2. Get the best move from the JSON, which is in [row, col] format.
+            const bestCanonicalMove = moveData.moves[Math.floor(Math.random() * moveData.moves.length)];
+            const [row, col] = bestCanonicalMove;
             
-            const targetStateAfterMove = simulateMove(
-                { gameState: canonicalStateDecoded.board, playerXMoves: canonicalStateDecoded.playerXMoves, playerOMoves: canonicalStateDecoded.playerOMoves },
-                bestCanonicalMove,
-                turn === X ? 'X' : 'O'
-            );
-            
-            const targetCanonicalKey = getCanonicalForm(
-                targetStateAfterMove.newGameState,
-                targetStateAfterMove.newPlayerXMoves,
-                targetStateAfterMove.newPlayerOMoves,
-                nextPlayer
-            );
+            // 3. Convert the canonical [row, col] move to a 1D board index (0-8).
+            const canonicalMoveIndex = row * 3 + col;
 
-            // 3. Get all available moves in the original state.
-            const currentPlayerMoves = (currentPlayer === 'X') ? playerXMoves : playerOMoves;
-            const availableMoves = getAvailableMoves(currentPlayerMoves, gameState);
-            
-            // 4. Find which of the original moves result in the target canonical state.
-            const validBestMoves = [];
-            for (const move of availableMoves) {
-                const resultingState = simulateMove({ gameState, playerXMoves, playerOMoves }, move, currentPlayer);
-                
-                const resultingKey = getCanonicalForm(
-                    resultingState.newGameState,
-                    resultingState.newPlayerXMoves,
-                    resultingState.newPlayerOMoves,
-                    nextPlayer
-                );
+            // 4. Find the corresponding move on the ORIGINAL board.
+            // The 'transform' array tells us: new_position = transform[old_position].
+            // To reverse this, we find the index where the value matches our target.
+            const originalMoveIndex = transform.indexOf(canonicalMoveIndex);
 
-                if (resultingKey === targetCanonicalKey) {
-                    validBestMoves.push(move);
-                }
-            }
-
-            // 5. Choose one of the potential moves randomly.
-            if (validBestMoves.length > 0) {
-                return validBestMoves[Math.floor(Math.random() * validBestMoves.length)];
-            }
-
-            console.error("Could not find a valid original move that maps to the canonical best move.");
-            return null; // Fallback
+            return originalMoveIndex;
         }
 
         function checkWin(board, player) {
+            const isX = player === 'X';
             for (let i = 0; i < winningConditions.length; i++) {
                 const [a, b, c] = winningConditions[i];
-                if (board[a] === player && board[b] === player && board[c] === player) {
-                    return true;
+                // Check if all three cells belong to the player (positive for X, negative for O)
+                const cellA = board[a];
+                const cellB = board[b];
+                const cellC = board[c];
+                if (isX) {
+                    if (cellA > 0 && cellB > 0 && cellC > 0) return true;
+                } else {
+                    if (cellA < 0 && cellB < 0 && cellC < 0) return true;
                 }
             }
             return false;
