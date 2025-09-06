@@ -63,7 +63,7 @@
         
     <footer class="absolute bottom-4 text-center w-full text-slate-500 text-sm">
         <p>
-            v1.1 |  
+            v1.2 |  
             <a href="https://github.com/to-be-released" target="_blank" class="text-sky-500 hover:text-sky-400 transition-colors">github</a>
         </p>
     </footer>
@@ -133,6 +133,15 @@
 
         function handleRestartGame() {
             gameActive = false;
+            // Add these lines to fully reset the game state
+            currentPlayer = 'X';
+            gameState = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+            humanPlayer = 'X';
+            aiPlayer = 'O';
+            statusDisplay.innerHTML = ''; // Clear status message
+            updateBoardUI(); // Visually clear the board
+
+            // Hide/show the correct sections
             gameArea.classList.add('hidden');
             playerSymbolSelection.classList.add('hidden');
             gameModeSelection.classList.remove('hidden');
