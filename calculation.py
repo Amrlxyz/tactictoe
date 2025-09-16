@@ -437,10 +437,14 @@ def evaluate_best_moves(states_encoded):
 
 
 
-def storeMoves(states_encoded, states_duplicate_pair, best_moves):
+def storeMoves(states_encoded, states_duplicate_pair, best_moves, scores):
     
     encoded_moves = list()
     duplicate_count = 0
+    scorex_max = -9999
+    scorex_min = 9999
+    scoreo_max = -9999
+    scoreo_min = 9999
 
     for state_encoded in states_encoded:
         state = decodeState(state_encoded)
@@ -454,31 +458,47 @@ def storeMoves(states_encoded, states_duplicate_pair, best_moves):
             if (turn == O):
                 raise KeyError  # the duplicates thats left should only be X's turn
             best_move_x = flatten_move(best_moves[state_encoded][0])
+            score_x = scores[state_encoded]
             state_o = encodeState(board_flat, O)
             best_move_o = flatten_move(best_moves[state_o][0])
+            score_o = scores[state_o]
 
         elif (turn == X):
             best_move_x = flatten_move(best_moves[state_encoded][0])
+            score_x = scores[state_encoded]
             best_move_o = 0x0F
+            score_o = 0x7F
 
         elif (turn == O):
             best_move_x = 0x0F
+            score_x = 0x7F
             best_move_o = flatten_move(best_moves[state_encoded][0])
+            score_o = scores[state_encoded]
+
+        scorex_max = max(score_x, scorex_max)
+        scorex_min = min(score_x, scorex_min)
+        scoreo_max = max(score_x, scoreo_max)
+        scoreo_min = min(score_x, scoreo_min)
 
         encoded_bytes = bytes([
             (location_arr[0] << 4) | location_arr[1],
             (location_arr[2] << 4) | location_arr[3],
             (location_arr[4] << 4) | location_arr[5],
             (    best_move_x << 4) | best_move_o,
-        ])
+        ]) + score_x.to_bytes(1, signed=True) + score_o.to_bytes(1, signed=True)
 
         encoded_moves.append(encoded_bytes)
     
+    print("x_max:", scorex_max) 
+    print("x_min:", scorex_min)
+    print("o_max:", scoreo_max)
+    print("o_min:", scoreo_min)
+
     print(f"Duplicate states optimised when storing best moves: {duplicate_count}")
     return encoded_moves
 
 
-def optimizeSize(states_encoded, scores, move_scores, best_moves):
+def optimizeSize(states_encoded, scores, best_moves):
     # Optimising the amount of states to be stored
     print("")
     print("Optimising...")
@@ -513,8 +533,8 @@ def optimizeSize(states_encoded, scores, move_scores, best_moves):
 
     # Store the optimised states with best moves into 4 bytes
     print("")
-    print(f"Encoding best moves for {len(optimised_states)} states into 4 bytes...")
-    encoded_best_moves = storeMoves(optimised_states, duplicate_pairs, best_moves)
+    print(f"Encoding best moves and score for {len(optimised_states)} states into 5 bytes...")
+    encoded_best_moves = storeMoves(optimised_states, duplicate_pairs, best_moves, scores)
 
     return encoded_best_moves
 
@@ -544,18 +564,20 @@ def export_to_c(bytes: list[bytes], var_name: str, filename: str):
             f.write("#include <stdint.h> // For uint8_t\n")
             f.write("#include <stddef.h> // For size_t\n\n")
 
-            f.write("// First 3 bytes represents the state, last byte is the best move \n")
+            f.write("// Bytes 0 to 2 -> Encoded canonical state, \n")
+            f.write("// Bytes 3      -> Best move 4 MSB for x, 4 LSB for o \n")
+            f.write("// Bytes 4 to 5 -> Score for the state, 4 LSB for o \n")
             f.write("// The array is pre-sorted (big-endian) \n")
 
             # 3. Write the array definition
             num_rows = len(bytes)
             # Using 'static const' is good practice for constant data in headers.
             # The empty [] for rows lets the compiler calculate the size automatically.
-            f.write(f"static const uint8_t {var_name}[][4] = {{\n")
+            f.write(f"static const uint8_t {var_name}[][6] = {{\n")
 
             for i, byte_obj in enumerate(bytes):
-                if len(byte_obj) != 4:
-                    raise ValueError(f"Error: Byte object at index {i} has length {len(byte_obj)}, expected 4.")
+                if len(byte_obj) != 6:
+                    raise ValueError(f"Error: Byte object at index {i} has length {len(byte_obj)}, expected 6.")
                 
                 # Format each byte as a two-digit hex string, e.g., "0xde"
                 hex_values = [f"0x{b:02x}" for b in byte_obj]
@@ -623,7 +645,7 @@ if __name__ == "__main__":
 
 
     # Optimise the size of the states into bytes
-    encoded_best_moves = optimizeSize(states_encoded, scores, move_scores, best_moves)
+    encoded_best_moves = optimizeSize(states_encoded, scores, best_moves)
 
     encoded_best_moves = sorted(encoded_best_moves)
     pprint([val.hex() for val in encoded_best_moves[-10:]])
