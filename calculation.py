@@ -298,7 +298,7 @@ def findDuplicates(states_encoded):
     
     print(f"Found {len(duplicates_pair)} duplicate pairs (same board, diff turn)")
 
-    return duplicates
+    return (duplicates, duplicates_pair)
 
 
 def evaluate_best_moves(states_encoded):
@@ -437,9 +437,10 @@ def evaluate_best_moves(states_encoded):
 
 
 
-def storeMoves(states_encoded, states_duplicate, best_moves):
+def storeMoves(states_encoded, states_duplicate_pair, best_moves):
     
     encoded_moves = list()
+    duplicate_count = 0
 
     for state_encoded in states_encoded:
         state = decodeState(state_encoded)
@@ -448,7 +449,8 @@ def storeMoves(states_encoded, states_duplicate, best_moves):
 
         location_arr = boardToPosition(board_flat)
 
-        if (state_encoded in states_duplicate):
+        if (state_encoded in states_duplicate_pair):
+            duplicate_count += 1
             if (turn == O):
                 raise KeyError  # the duplicates thats left should only be X's turn
             best_move_x = flatten_move(best_moves[state_encoded][0])
@@ -472,6 +474,7 @@ def storeMoves(states_encoded, states_duplicate, best_moves):
 
         encoded_moves.append(encoded_bytes)
     
+    print(f"Duplicate states optimised when storing best moves: {duplicate_count}")
     return encoded_moves
 
 
@@ -488,7 +491,7 @@ def optimizeSize(states_encoded, scores, move_scores, best_moves):
 
     # 2 - find board duplicates but diff turns
     original_len = len(optimised_states)
-    duplicates = findDuplicates(optimised_states)
+    duplicates, duplicate_pairs = findDuplicates(optimised_states)
     for duplicate in duplicates:
         optimised_states.remove(duplicate)
     new_len = len(optimised_states)
@@ -510,8 +513,8 @@ def optimizeSize(states_encoded, scores, move_scores, best_moves):
 
     # Store the optimised states with best moves into 4 bytes
     print("")
-    print(f"Encoding the {len(optimised_states)} best moves into 4 bytes...")
-    encoded_best_moves = storeMoves(optimised_states, duplicates, best_moves)
+    print(f"Encoding best moves for {len(optimised_states)} states into 4 bytes...")
+    encoded_best_moves = storeMoves(optimised_states, duplicate_pairs, best_moves)
 
     return encoded_best_moves
 
