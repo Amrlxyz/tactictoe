@@ -17,14 +17,33 @@
         .cell-content.next-to-remove { opacity: 0.5; }
         .hidden { display: none; }
         .mode-button.selected { background-color: #0ea5e9; }
+        .life-display {
+            position: absolute;
+            bottom: 0.25rem;
+            left: 0.5rem;
+            font-size: 1rem;
+            font-weight: 500;
+            color: #64748b; /* A muted slate color */
+            font-family: monospace; /* Monospaced fonts work well for numbers */
+        }
         @media (min-width: 640px) { .cell-content { font-size: 4.5rem; } }
     </style>
 </head>
 <body class="bg-slate-900 text-white flex items-center justify-center min-h-screen p-4">
     <main class="w-full max-w-md mx-auto text-center">
         <h1 class="text-4xl md:text-5xl font-bold mb-2 text-slate-200">tactic-toe</h1>
-        <p class="text-slate-400 mb-4">Tactical tictactoe (3-Mark Limit)</p>
-        
+        <p class="text-slate-400 mb-4">tic-tac-toe with a 3-mark limit</p>
+
+        <div id="rules-section" class="bg-slate-800/50 border border-slate-700 p-4 rounded-lg my-6 max-w-sm mx-auto text-sm">
+            <h3 class="font-bold text-base text-slate-200 mb-2">How to Play</h3>
+            <ul class="list-disc list-inside text-slate-400 space-y-1">
+                <li>Its the classic tic-tac-toe <strong>BUT WITH A TWIST:</strong></li>
+                <li>Each player can only have a <strong>maximum of three marks</strong> on the board.</li>
+                <li>Placing the fourth mark <strong>removes the oldest one</strong>.</li>
+                <li>The number shows a mark's life, the one at '1' is the next to go!</li>
+            </ul>
+        </div>
+
         <div id="game-mode-selection" class="mb-6">
             <h3 class="text-lg text-slate-300 mb-3">Choose your opponent:</h3>
             <div class="flex justify-center gap-4">
@@ -44,15 +63,42 @@
         <div id="game-area" class="hidden">
             <h2 id="status" class="text-xl md:text-2xl font-medium mb-6 h-8 text-slate-400"></h2>
             <section id="game-board" class="grid grid-cols-3 gap-3 bg-slate-800 p-3 rounded-lg shadow-2xl">
-                <div class="cell bg-slate-900 rounded-md cursor-pointer hover:bg-slate-700"><div class="cell-content"></div></div>
-                <div class="cell bg-slate-900 rounded-md cursor-pointer hover:bg-slate-700"><div class="cell-content"></div></div>
-                <div class="cell bg-slate-900 rounded-md cursor-pointer hover:bg-slate-700"><div class="cell-content"></div></div>
-                <div class="cell bg-slate-900 rounded-md cursor-pointer hover:bg-slate-700"><div class="cell-content"></div></div>
-                <div class="cell bg-slate-900 rounded-md cursor-pointer hover:bg-slate-700"><div class="cell-content"></div></div>
-                <div class="cell bg-slate-900 rounded-md cursor-pointer hover:bg-slate-700"><div class="cell-content"></div></div>
-                <div class="cell bg-slate-900 rounded-md cursor-pointer hover:bg-slate-700"><div class="cell-content"></div></div>
-                <div class="cell bg-slate-900 rounded-md cursor-pointer hover:bg-slate-700"><div class="cell-content"></div></div>
-                <div class="cell bg-slate-900 rounded-md cursor-pointer hover:bg-slate-700"><div class="cell-content"></div></div>
+                <div class="cell bg-slate-900 rounded-md cursor-pointer hover:bg-slate-700">
+                    <div class="cell-content"></div>
+                    <div class="life-display"></div>
+                </div>
+                <div class="cell bg-slate-900 rounded-md cursor-pointer hover:bg-slate-700">
+                    <div class="cell-content"></div>
+                    <div class="life-display"></div>
+                </div>
+                <div class="cell bg-slate-900 rounded-md cursor-pointer hover:bg-slate-700">
+                    <div class="cell-content"></div>
+                    <div class="life-display"></div>
+                </div>
+                <div class="cell bg-slate-900 rounded-md cursor-pointer hover:bg-slate-700">
+                    <div class="cell-content"></div>
+                    <div class="life-display"></div>
+                </div>
+                <div class="cell bg-slate-900 rounded-md cursor-pointer hover:bg-slate-700">
+                    <div class="cell-content"></div>
+                    <div class="life-display"></div>
+                </div>
+                <div class="cell bg-slate-900 rounded-md cursor-pointer hover:bg-slate-700">
+                    <div class="cell-content"></div>
+                    <div class="life-display"></div>
+                </div>                
+                <div class="cell bg-slate-900 rounded-md cursor-pointer hover:bg-slate-700">
+                    <div class="cell-content"></div>
+                    <div class="life-display"></div>
+                </div>
+                <div class="cell bg-slate-900 rounded-md cursor-pointer hover:bg-slate-700">
+                    <div class="cell-content"></div>
+                    <div class="life-display"></div>
+                </div>
+                <div class="cell bg-slate-900 rounded-md cursor-pointer hover:bg-slate-700">
+                    <div class="cell-content"></div>
+                    <div class="life-display"></div>
+                </div>
             </section>
             <div class="mt-8 flex justify-center gap-4">
                 <button id="reset-game-button" class="bg-sky-600 text-white font-bold py-3 px-8 rounded-lg shadow-lg hover:bg-sky-700 transition-all">Reset</button>
@@ -63,7 +109,7 @@
         
     <footer class="absolute bottom-4 text-center w-full text-slate-500 text-sm">
         <p>
-            v1.2 |  
+            v2.0 |  
             <a href="https://github.com/to-be-released" target="_blank" class="text-sky-500 hover:text-sky-400 transition-colors">github</a>
         </p>
     </footer>
@@ -77,6 +123,7 @@
         const pvpButton = document.getElementById('pvp-button');
         const pvaButton = document.getElementById('pva-button');
         const gameArea = document.getElementById('game-area');
+        const rulesSection = document.getElementById('rules-section');
         const playerSymbolSelection = document.getElementById('player-symbol-selection');
         const chooseXButton = document.getElementById('choose-x-button');
         const chooseOButton = document.getElementById('choose-o-button');
@@ -99,6 +146,7 @@
         function selectGameMode(mode) {
             gameMode = mode;
             gameModeSelection.classList.add('hidden');
+            rulesSection.classList.add('hidden'); // <-- ADD THIS LINE
             if (mode === 'pvp') {
                 gameArea.classList.remove('hidden');
                 startGame();
@@ -145,6 +193,7 @@
             gameArea.classList.add('hidden');
             playerSymbolSelection.classList.add('hidden');
             gameModeSelection.classList.remove('hidden');
+            rulesSection.classList.remove('hidden');
         }
 
         function handleCellClick(clickedCellEvent) {
@@ -200,19 +249,30 @@
          */
         function updateBoardUI() {
             gameState.forEach((cellValue, index) => {
-                const cellContent = gameCells[index].querySelector('.cell-content');
-                cellContent.textContent = '';
-                cellContent.className = 'cell-content'; // Reset classes
+                const cell = gameCells[index];
+                const cellContent = cell.querySelector('.cell-content');
+                const lifeDisplay = cell.querySelector('.life-display'); // Get the new element
 
-                if (cellValue > 0) {
-                    cellContent.textContent = 'X';
-                    cellContent.classList.add('x');
-                } else if (cellValue < 0) {
-                    cellContent.textContent = 'O';
-                    cellContent.classList.add('o');
+                // Reset content and classes for both elements
+                cellContent.textContent = '';
+                cellContent.className = 'cell-content';
+                lifeDisplay.textContent = '';
+
+                if (cellValue !== 0) {
+                    // Use the absolute value of cellValue for the life counter
+                    lifeDisplay.textContent = Math.abs(cellValue); 
+                    
+                    if (cellValue > 0) {
+                        cellContent.textContent = 'X';
+                        cellContent.classList.add('x');
+                    } else { // cellValue < 0
+                        cellContent.textContent = 'O';
+                        cellContent.classList.add('o');
+                    }
                 }
             });
         }
+
         
         function handleResultValidation() {
             if (checkWin(gameState, currentPlayer)) {
