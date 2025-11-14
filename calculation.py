@@ -451,17 +451,25 @@ def storeMoves(states_encoded, states_duplicate_pair, best_moves, scores):
         board_flat = flatten_board(state["board"])
         turn = state["turn"]
 
+        # Get the duplicate state to be stored together
+        reversed_turn = X if turn == O else O
+        reversed_state = encodeState(board_flat, reversed_turn)
+
         location_arr = boardToPosition(board_flat)
 
-        if (state_encoded in states_duplicate_pair):
+        if (reversed_state in scores):
             duplicate_count += 1
-            if (turn == O):
-                raise KeyError  # the duplicates thats left should only be X's turn
-            best_move_x = flatten_move(best_moves[state_encoded][0])
-            score_x = scores[state_encoded]
-            state_o = encodeState(board_flat, O)
-            best_move_o = flatten_move(best_moves[state_o][0])
-            score_o = scores[state_o]
+            if (turn == X):
+                best_move_x = flatten_move(best_moves[state_encoded][0])
+                score_x = scores[state_encoded]
+                best_move_o = flatten_move(best_moves[reversed_state][0])
+                score_o = scores[reversed_state]
+            else:
+                best_move_o = flatten_move(best_moves[state_encoded][0])
+                score_o = scores[state_encoded]
+                best_move_x = flatten_move(best_moves[reversed_state][0])
+                score_x = scores[reversed_state]
+                
 
         elif (turn == X):
             best_move_x = flatten_move(best_moves[state_encoded][0])
@@ -475,10 +483,14 @@ def storeMoves(states_encoded, states_duplicate_pair, best_moves, scores):
             best_move_o = flatten_move(best_moves[state_encoded][0])
             score_o = scores[state_encoded]
 
-        scorex_max = max(score_x, scorex_max)
+
+        if score_x != 0x7F:
+            scorex_max = max(score_x, scorex_max)
         scorex_min = min(score_x, scorex_min)
-        scoreo_max = max(score_x, scoreo_max)
-        scoreo_min = min(score_x, scoreo_min)
+
+        if score_o != 0x7F:
+            scoreo_max = max(score_o, scoreo_max)
+        scoreo_min = min(score_o, scoreo_min)
 
         encoded_bytes = bytes([
             (location_arr[0] << 4) | location_arr[1],
@@ -509,16 +521,8 @@ def optimizeSize(states_encoded, scores, best_moves):
     new_len = len(optimised_states)
     print(f"1. Removed terminal states -> {original_len} to {new_len} (-{original_len - new_len})")
 
-    # 2 - find board duplicates but diff turns
-    original_len = len(optimised_states)
-    duplicates, duplicate_pairs = findDuplicates(optimised_states)
-    for duplicate in duplicates:
-        optimised_states.remove(duplicate)
-    new_len = len(optimised_states)
-    print(f"2. Removed duplicate states -> {original_len} to {new_len} (-{original_len - new_len})")
-
     # 3 - remove the states that is {depth} moves from winning
-    depth_to_remove = 7
+    depth_to_remove = 9
     for depth in range(depth_to_remove+1):
         original_len = len(optimised_states)
         state_to_remove = set()
@@ -530,6 +534,16 @@ def optimizeSize(states_encoded, scores, best_moves):
             optimised_states.remove(state)
         new_len = len(optimised_states)
         print(f"3.{depth} Removed states that is {depth} moves to winning -> {original_len} to {new_len} (-{original_len - new_len})")
+
+
+    # 2 - find board duplicates but diff turns
+    original_len = len(optimised_states)
+    duplicates, duplicate_pairs = findDuplicates(optimised_states)
+    for duplicate in duplicates:
+        optimised_states.remove(duplicate)
+    new_len = len(optimised_states)
+    print(f"2. Removed duplicate states -> {original_len} to {new_len} (-{original_len - new_len})")
+
 
     # Store the optimised states with best moves into 4 bytes
     print("")
@@ -636,12 +650,20 @@ if __name__ == "__main__":
     
     states_encoded, scores, move_scores, best_moves = calculate()
 
+    max_score = -9999
+    min_score = +9999
+    for score in scores.values():
+        max_score = max(max_score, score)
+        min_score = min(min_score, score)
+    print(f"Max score: {max_score}, Min Score: {min_score} \n")
+
+
     pprint("Example Initial State")
     board_flat = flatten_board(initial_state()["board"])
     pprint([(score, move, decodeState(state)) for move, score, state in move_scores[encodeState(board_flat, X)]])
 
     # Export to json for web version
-    export_to_json(scores, best_moves, "tactictoe_states.json")
+    # export_to_json(scores, best_moves, "tactictoe_states.json")
 
 
     # Optimise the size of the states into bytes
