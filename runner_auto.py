@@ -6,8 +6,8 @@ import time
 import tactictoe_precalculated as ttt
 
 ttt.init()
-MOVE_DELAY = 0.2
-RESET_DELAY = 1
+MOVE_DELAY = 2
+RESET_DELAY = 4
 
 pygame.init()
 size = width, height = 600, 400
@@ -37,7 +37,7 @@ while True:
 
     # Let user choose a player.
     if user is None:
-        user = ttt.O
+        user = ttt.X
         
     else:
 
@@ -58,11 +58,10 @@ while True:
 
                 padding = 7 # Pixels to push numbers away from the borders
 
-                # --- Display score number in bottom-left ---
-                if state["board"][i][j] == ttt.EMPTY:
+                # --- Display lifetime number in bottom-left ---
+                if state["board"][i][j] != ttt.EMPTY:
                     # Render the text
-                    move_score_str = ttt.getStateScore(ttt.result(state, (i, j)))
-                    left_num_surface = smallFont.render(move_score_str, True, white)
+                    left_num_surface = smallFont.render(str(abs(state["board"][i][j])), True, white)
                     # Get the rectangle of the rendered text
                     left_num_rect = left_num_surface.get_rect()
                     # Position the text's rectangle in the bottom-left of the cell
@@ -70,10 +69,11 @@ while True:
                     # Draw it on the screen
                     screen.blit(left_num_surface, left_num_rect)
 
-                # --- Display lifetime number in bottom-right ---
-                if state["board"][i][j] != ttt.EMPTY:
+                # --- Display score number in bottom-right ---
+                if state["board"][i][j] == ttt.EMPTY:
                     # Render the text
-                    right_num_surface = smallFont.render(str(state["board"][i][j]), True, white)
+                    move_score_str = ttt.getStateScore(ttt.result(state, (i, j)))
+                    right_num_surface = smallFont.render(move_score_str, True, white)
                     # Get the rectangle of the rendered text
                     right_num_rect = right_num_surface.get_rect()
                     # Position the text's rectangle in the bottom-right of the cell
@@ -106,12 +106,12 @@ while True:
             if winner is None:
                 title = f"Game Over: Tie."
             else:
-                title = f"Game Over: {winner_str} wins."
+                title = f"{winner_str} Wins"
 
         elif user == player:
-            title = f"Computer 1 thinking..."
+            title = f"X's Turn, Score: {ttt.getStateScore(state)}"
         else:
-            title = f"Computer 2 thinking..."
+            title = f"O's Turn, Score: {ttt.getStateScore(state)}"
         title = largeFont.render(title, True, white)
         titleRect = title.get_rect()
         titleRect.center = ((width / 2), 30)
@@ -123,7 +123,8 @@ while True:
  
         if user != player and not game_over:
             time.sleep(MOVE_DELAY)
-            move = ttt.getRandomMove(state)
+            # move = ttt.getRandomMove(state)
+            move = ttt.getBestMove(state)
             state = ttt.result(state, move)
 
         if user == player and not game_over:
