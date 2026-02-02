@@ -1,5 +1,9 @@
 # Tactic-toe Software
 
+![optimal moves](/docs/tactictoe_optimal-moves.gif)
+
+![online game](/docs/tactictoe_web-game.png)
+
 ## Project Details
 
 * **Overview:** [amierulhakeem.dev/projects/tactictoe-overview/](https://amierulhakeem.dev/projects/tactictoe-overview/)
