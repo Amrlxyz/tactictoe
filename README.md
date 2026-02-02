@@ -1,8 +1,16 @@
 # Tactic-toe Software
 
+### Calculated optimal move sequence
+
 ![optimal moves](/docs/tactictoe_optimal-moves.gif)
 
+### Online version of tactic-toe
+
 ![online game](/docs/tactictoe_web-game.png)
+
+**Play tactic-toe:** [tactic-toe.pages.dev](https://tactic-toe.pages.dev)
+
+
 
 ## Project Details
 
@@ -18,6 +26,7 @@
 | `tactictoeV2.py` | Minimax AI version 2 |
 | `tactictoeV2_negamax_basic.py` | Negamax implementation |
 | **`calculation.py`** | **Final Implementation:** Also exports best moves in .h and .json |
+| `/web_version/index.html` | HTML version of the game |
 
 
 ## Execution
@@ -35,6 +44,3 @@ Modify the import in any runner file:
 import tactictoeV2_negamax_basic as ttt  # Swap with any version file
 ```
 
-## Web Version
-
-`/web_version/index.html`: HTML version of the game
