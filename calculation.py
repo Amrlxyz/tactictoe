@@ -520,8 +520,10 @@ def optimizeSize(states_encoded, scores, best_moves):
     optimised_states = set([state for state in states_encoded if winner(decodeState(state)) == 0])
     new_len = len(optimised_states)
     print(f"1. Removed terminal states -> {original_len} to {new_len} (-{original_len - new_len})")
+    
+    print()
 
-    # 3 - remove the states that is {depth} moves from winning
+    # 2 - remove the states that is {depth} moves from winning
     depth_to_remove = 9
     for depth in range(depth_to_remove+1):
         original_len = len(optimised_states)
@@ -533,16 +535,17 @@ def optimizeSize(states_encoded, scores, best_moves):
         for state in state_to_remove:
             optimised_states.remove(state)
         new_len = len(optimised_states)
-        print(f"3.{depth} Removed states that is {depth} moves to winning -> {original_len} to {new_len} (-{original_len - new_len})")
+        print(f"2.{depth} Removed states that is {depth} moves to winning -> {original_len} to {new_len} (-{original_len - new_len})")
 
+    print()
 
-    # 2 - find board duplicates but diff turns
+    # 3 - find board duplicates but diff turns
     original_len = len(optimised_states)
     duplicates, duplicate_pairs = findDuplicates(optimised_states)
     for duplicate in duplicates:
         optimised_states.remove(duplicate)
     new_len = len(optimised_states)
-    print(f"2. Removed duplicate states -> {original_len} to {new_len} (-{original_len - new_len})")
+    print(f"3. Removed duplicate states -> {original_len} to {new_len} (-{original_len - new_len})")
 
 
     # Store the optimised states with best moves into 4 bytes
@@ -580,7 +583,8 @@ def export_to_c(bytes: list[bytes], var_name: str, filename: str):
 
             f.write("// Bytes 0 to 2 -> Encoded canonical state, \n")
             f.write("// Bytes 3      -> Best move 4 MSB for x, 4 LSB for o \n")
-            f.write("// Bytes 4 to 5 -> Score for the state, 4 LSB for o \n")
+            f.write("// Bytes 4      -> Score for the state (X's turn) \n")
+            f.write("// Bytes 5      -> Socre for the state (O's turn) \n")
             f.write("// The array is pre-sorted (big-endian) \n")
 
             # 3. Write the array definition

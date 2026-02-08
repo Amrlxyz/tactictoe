@@ -6,7 +6,8 @@
 
 // Bytes 0 to 2 -> Encoded canonical state, 
 // Bytes 3      -> Best move 4 MSB for x, 4 LSB for o 
-// Bytes 4 to 5 -> Score for the state, 4 LSB for o 
+// Bytes 4      -> Score for the state (X's turn)
+// Bytes 5      -> Socre for the state (O's turn)
 // The array is pre-sorted (big-endian) 
 static const uint8_t precalculatedMoves[][6] = {
     { 0x01, 0x32, 0x74, 0x56, 0xf0, 0x00 },
